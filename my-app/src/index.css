@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 10% 97%; /* #fafaf9 cream */
+    --foreground: 0 0% 29%; /* #4a4a4a warm gray */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 29%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 29%;
+    --primary: 216 28% 23%; /* #2d3748 ink blue */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 216 28% 23%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 45 73% 52%; /* #d4af37 gold */
+    --accent-foreground: 216 28% 23%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 45 73% 52%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-ink-cream text-ink-gray font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif text-ink-primary;
+  }
+}
+
+@layer components {
+  /* Auth page layout */
+  .auth-container {
+    @apply min-h-screen bg-ink-cream flex items-center justify-center p-6;
+  }
+  
+  .auth-card {
+    @apply bg-white rounded-2xl shadow-soft-lg p-8 w-full max-w-md;
+  }
+  
+  /* Custom focus styles */
+  .input-focus {
+    @apply focus:ring-2 focus:ring-ink-gold focus:ring-offset-2 focus:ring-offset-ink-cream focus:border-ink-gold;
+  }
+  
+  /* Gentle button styles */
+  .btn-primary {
+    @apply bg-ink-primary text-white px-6 py-3 rounded-lg font-medium
+           hover:bg-opacity-90 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-ink-gold focus:ring-offset-2;
+  }
+  
+  .btn-secondary {
+    @apply bg-transparent border-2 border-ink-lightgray text-ink-gray px-6 py-3 rounded-lg font-medium
+           hover:border-ink-primary hover:text-ink-primary transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-ink-gold focus:ring-offset-2;
+  }
+}
