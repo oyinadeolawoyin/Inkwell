@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
-import API_URL from "../../config/api";
+import API_URL from "@/config/api";
 
 const DAYS = [
   { key: "monday", label: "Monday", short: "Mon" },
@@ -17,11 +17,62 @@ export default function SetupPlan() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
+  const [existingPlan, setExistingPlan] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [selectedDays, setSelectedDays] = useState({});
   const [goals, setGoals] = useState({});
   const [times, setTimes] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState("");
+
+  // Fetch existing plan on mount
+  useEffect(() => {
+    fetchExistingPlan();
+  }, []);
+
+  async function fetchExistingPlan() {
+    try {
+      const res = await fetch(`${API_URL}/writingPlan`, {
+        credentials: "include",
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const plan = data.writingPlan || data;
+        
+        if (plan && plan.id) {
+          setExistingPlan(plan);
+          setIsEditing(true);
+          
+          // Populate the form with existing data
+          const newSelectedDays = {};
+          const newGoals = {};
+          const newTimes = {};
+          
+          DAYS.forEach(day => {
+            const goalKey = `${day.key}Goal`;
+            const timeKey = `${day.key}Time`;
+            
+            // If time is NOT null, day is selected
+            if (plan[timeKey] !== null) {
+              newSelectedDays[day.key] = true;
+              newGoals[day.key] = plan[goalKey] || 0;
+              newTimes[day.key] = plan[timeKey] || "09:00";
+            }
+          });
+          
+          setSelectedDays(newSelectedDays);
+          setGoals(newGoals);
+          setTimes(newTimes);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch plan:", err);
+    } finally {
+      setIsFetching(false);
+    }
+  }
 
   function toggleDay(dayKey) {
     setSelectedDays(prev => {
@@ -37,6 +88,11 @@ export default function SetupPlan() {
         setTimes(newTimes);
       } else {
         newSelected[dayKey] = true;
+        // Set default time when selecting
+        setTimes(prev => ({
+          ...prev,
+          [dayKey]: prev[dayKey] || "09:00"
+        }));
       }
       return newSelected;
     });
@@ -88,12 +144,24 @@ export default function SetupPlan() {
         }
       });
 
-      const res = await fetch(`${API_URL}/writingPlan/createPlan`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(plan),
-      });
+      let res;
+      if (isEditing && existingPlan?.id) {
+        // UPDATE existing plan
+        res = await fetch(`${API_URL}/writingPlan/${existingPlan.id}/updatePlan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(plan),
+        });
+      } else {
+        // CREATE new plan
+        res = await fetch(`${API_URL}/writingPlan/createPlan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(plan),
+        });
+      }
 
       if (res.ok) {
         navigate("/dashboard");
@@ -110,16 +178,30 @@ export default function SetupPlan() {
 
   const selectedCount = Object.keys(selectedDays).length;
 
+  // Show loading state while fetching
+  if (isFetching) {
+    return (
+      <div className="min-h-screen bg-ink-cream flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ink-primary mx-auto mb-4"></div>
+          <p className="text-ink-gray">Loading your plan...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-ink-cream py-6 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif text-ink-primary mb-4">
-            Set Your Writing Days
+            {isEditing ? "Update Your Writing Days" : "Set Your Writing Days"}
           </h1>
           <p className="text-base sm:text-lg text-ink-gray max-w-2xl mx-auto leading-relaxed">
-            Pick 2-4 days that work for you. You can always change this later.
+            {isEditing 
+              ? "Adjust your schedule as needed. Life changes, and that's okay." 
+              : "Pick 2-4 days that work for you. You can always change this later."}
           </p>
         </div>
 
@@ -148,7 +230,7 @@ export default function SetupPlan() {
                     {/* Checkmark */}
                     <div className="mb-2">
                       {selectedDays[day.key] ? (
-                        <span className="text-2xl">✓</span>
+                        <span className="text-2xl text-ink-gold">✓</span>
                       ) : (
                         <div className="w-6 h-6 mx-auto rounded-full border-2 border-gray-300"></div>
                       )}
@@ -257,7 +339,7 @@ export default function SetupPlan() {
               className="order-2 sm:order-1 w-full sm:w-auto text-ink-gray hover:text-ink-primary 
                        transition-colors text-sm sm:text-base"
             >
-              Skip for now
+              {isEditing ? "Cancel" : "Skip for now"}
             </button>
 
             <button
@@ -275,10 +357,10 @@ export default function SetupPlan() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Saving...
+                  {isEditing ? "Updating..." : "Saving..."}
                 </span>
               ) : (
-                "Save My Plan"
+                isEditing ? "Update My Plan" : "Save My Plan"
               )}
             </button>
           </div>
@@ -286,7 +368,9 @@ export default function SetupPlan() {
           {/* Help Text */}
           <div className="mt-8 pt-6 border-t border-ink-lightgray">
             <p className="text-xs sm:text-sm text-center text-gray-500 italic">
-              Don't worry, you can change this anytime in settings.
+              {isEditing 
+                ? "Your changes will be saved immediately." 
+                : "Don't worry, you can change this anytime in settings."}
             </p>
           </div>
         </div>
