@@ -27,6 +27,7 @@ export default function ProgressStats() {
       if (weeklyRes.ok) {
         const weeklyData = await weeklyRes.json();
         setWeeklyProgress(weeklyData);
+        console.log("ps", weeklyData);
       }
     } catch (error) {
       console.error("Failed to fetch progress:", error);
@@ -53,24 +54,36 @@ export default function ProgressStats() {
 
   if (hasNoProgress) {
     return (
-      <div className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
-        <div className="text-center py-8">
-          <div className="mb-4">
-            <span className="text-5xl">📊</span>
+      <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 rounded-2xl shadow-lg border-2 border-amber-200/50 p-6 sm:p-8 lg:p-10">
+        {/* Decorative background */}
+        <div className="absolute inset-0 opacity-10 pointer-events-none rounded-2xl">
+          <div className="absolute bottom-10 right-10 w-32 h-32 bg-[#d4af37] rounded-full blur-3xl"></div>
+        </div>
+
+        <div className="relative z-10 text-center">
+          <div className="mb-6">
+            <span className="text-6xl sm:text-7xl">🌱</span>
           </div>
-          <h3 className="text-xl font-serif text-ink-primary mb-2">
-            Start Your First Sprint
+          <h3 className="text-xl sm:text-2xl font-serif font-bold text-[#2d3748] mb-3">
+            Your story is waiting
           </h3>
-          <p className="text-ink-gray mb-6 max-w-md mx-auto">
-            Your progress will show up here. Even 10 minutes counts!
-          </p>
+          <div className="max-w-md mx-auto space-y-2 mb-6">
+            <p className="text-sm sm:text-base text-[#4a4a4a] leading-relaxed">
+              The hardest part? Showing up. And you're already here.
+            </p>
+            <p className="text-sm sm:text-base text-[#6b6b6b]">
+              Start with just 10 minutes. See where it takes you.
+            </p>
+          </div>
           <button
             onClick={() => navigate("/sprint/start")}
-            className="px-6 py-3 bg-ink-primary text-white rounded-lg font-medium
-                     hover:bg-opacity-90 transition-all shadow-soft"
+            className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-[#2d3748] to-[#1a202c] text-white text-base sm:text-lg font-semibold rounded-xl hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
           >
-            Start Writing
+            Start Your First Sprint
           </button>
+          <p className="mt-4 text-xs sm:text-sm text-[#8a8a8a] italic">
+            Your progress will show up here. We'll be cheering you on! ✨
+          </p>
         </div>
       </div>
     );
@@ -197,11 +210,11 @@ export default function ProgressStats() {
           </div>
 
           {weeklyProgress?.bonusDays > 0 && (
-            <div className="text-center p-3 bg-purple-50 rounded-lg">
+            <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg">
               <div className="text-xl sm:text-2xl font-bold text-purple-600">
                 +{weeklyProgress.bonusDays}
               </div>
-              <div className="text-xs text-purple-500">bonus</div>
+              <div className="text-xs text-purple-600 font-medium">bonus days</div>
             </div>
           )}
         </div>

@@ -33,7 +33,7 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <button
-                  onClick={() => navigate("/sprint/start")}
+                  onClick={() => navigate("/start-sprint")}
                   className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-ink-primary text-white 
                            text-base sm:text-lg font-medium rounded-xl
                            hover:bg-opacity-90 transition-all shadow-soft

@@ -10,11 +10,23 @@ import Login from './components/auth/login';
 import Welcome from './components/auth/welcome';
 import SetupPlan from './components/writingPlan/setupPlan';
 import Dashboard from './components/dashboard/dashboard';
-// import App from './App'
+import ActiveSprint from './components/sprint/workspace';
+import StartSprint from './components/sprint/startSprint';
+import Notification from './components/notification/notification';
+import App from './App'
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/service-worker.js");
+}
+
 
 const router = createBrowserRouter([
   {
     path: "/",
+    element: <App />
+  },
+  {
+    path: "/signup",
     element: <Signup />
   },
   {
@@ -32,6 +44,18 @@ const router = createBrowserRouter([
   {
     path: "/dashboard",
     element: <Dashboard />
+  },
+  {
+    path: "/sprint/:sprintId",
+    element: <ActiveSprint />,
+  },
+  {
+    path: "/start-sprint",
+    element: <StartSprint />
+  },
+  {
+    path: "/notifications",
+    element: <Notification />
   }
 ])
 

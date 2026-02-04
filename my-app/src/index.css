@@ -68,3 +68,55 @@
            focus:outline-none focus:ring-2 focus:ring-ink-gold focus:ring-offset-2;
   }
 }
+
+@layer utilities {
+  /* Ink/Cream Color System */
+  .bg-ink-cream {
+    background-color: #fafaf9;
+  }
+  
+  .bg-ink-primary {
+    background-color: #2d3748;
+  }
+  
+  .bg-ink-gold {
+    background-color: #d4af37;
+  }
+  
+  .text-ink-primary {
+    color: #2d3748;
+  }
+  
+  .text-ink-gray {
+    color: #4a4a4a;
+  }
+  
+  .text-ink-lightgray {
+    color: #737373;
+  }
+  
+  .text-ink-gold {
+    color: #d4af37;
+  }
+  
+  .border-ink-gold {
+    border-color: #d4af37;
+  }
+  
+  .border-ink-primary {
+    border-color: #2d3748;
+  }
+  
+  .border-ink-lightgray {
+    border-color: #e5e5e5;
+  }
+  
+  /* Soft shadows for depth */
+  .shadow-soft {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  }
+  
+  .shadow-soft-lg {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  }
+}
