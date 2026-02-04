@@ -1,7 +1,7 @@
 // API Configuration
 // This automatically uses the correct API URL based on environment
 
-export const API_URL = import.meta.env.VITE_API_URL 
+export const API_URL = import.meta.env.VITE_API_URL || "https://odin-book-h6e3.onrender.com/api"
 
 // Helper function for making API calls
 export const apiCall = async (endpoint, options = {}) => {
