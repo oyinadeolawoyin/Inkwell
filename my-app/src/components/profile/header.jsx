@@ -166,7 +166,7 @@ export default function Header() {
               </div>
 
               {/* Authenticated - Mobile */}
-              <div className="flex sm:hidden items-center gap-3">
+              <div className="flex sm:hidden items-center gap-3 relative">
                 {/* Notification Bell - Mobile */}
                 <Link 
                   to="/notifications"
@@ -201,6 +201,50 @@ export default function Header() {
                 >
                   {user?.username?.charAt(0).toUpperCase() || 'U'}
                 </button>
+
+                {/* Dropdown Menu - Mobile */}
+                {showDropdown && (
+                  <>
+                    {/* Backdrop */}
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setShowDropdown(false)}
+                    />
+                    
+                    {/* Menu */}
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-soft-lg border border-ink-lightgray z-20 py-2 top-full">
+                      <div className="px-4 py-3 border-b border-ink-lightgray">
+                        <p className="text-sm font-medium text-ink-primary">{user?.username}</p>
+                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                      </div>
+                      
+                      <Link
+                        to="/profile"
+                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        Profile
+                      </Link>
+                      
+                      <Link
+                        to="/dashboard"
+                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        Dashboard
+                      </Link>
+                      
+                      <div className="border-t border-ink-lightgray mt-2 pt-2">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}

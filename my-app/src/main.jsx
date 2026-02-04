@@ -13,6 +13,7 @@ import Dashboard from './components/dashboard/dashboard';
 import ActiveSprint from './components/sprint/workspace';
 import StartSprint from './components/sprint/startSprint';
 import Notification from './components/notification/notification';
+import Profile from './components/profile/profile';
 import App from './App'
 
 if ("serviceWorker" in navigator) {
@@ -44,6 +45,10 @@ const router = createBrowserRouter([
   {
     path: "/dashboard",
     element: <Dashboard />
+  },
+  {
+    path: "profile",
+    element: <Profile />
   },
   {
     path: "/sprint/:sprintId",
