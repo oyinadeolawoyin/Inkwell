@@ -5,6 +5,7 @@ import Header from "./components/profile/header";
 import API_URL from "@/config/api";
 import DailyQuote from "./components/quote/dailyQuote";
 import NotificationsSetup from "./components/notification/notificationSetup";
+import { AppMetaTags } from "./components/utilis/metatags";
 
 export default function Homepage() {
   const navigate = useNavigate();
@@ -85,7 +86,7 @@ export default function Homepage() {
     <div className="min-h-screen bg-ink-cream">
       {/* Header */}
       <Header />
-
+       <AppMetaTags />
       {/* Push notifications setup (runs only if user exists) */}
       <NotificationsSetup user={user} />
 

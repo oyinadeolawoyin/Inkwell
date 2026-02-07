@@ -3,6 +3,7 @@ import Header from "../profile/header";
 import DailyQuote from "../quote/dailyQuote";
 import WritingSchedule from "../writingPlan/writingSchedule";
 import ProgressStats from "../writingPlan/progressStats";
+import { AppMetaTags } from "../utilis/metatags";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-ink-cream">
       {/* Header */}
       <Header />
-
+      <AppMetaTags />
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
         {/* Desktop: 2 Column Layout, Mobile: Stack */}

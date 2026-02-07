@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import './index.css'
 
 import { AuthProvider } from './components/auth/authContext'
+import { HelmetProvider } from 'react-helmet-async';
 
 import Signup from './components/auth/signup';
 import Login from './components/auth/login';
@@ -67,7 +68,9 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
-      <RouterProvider router={router} />
+      <HelmetProvider>
+        <RouterProvider router={router} />
+      </HelmetProvider>
     </AuthProvider>
   </StrictMode>,
 )
