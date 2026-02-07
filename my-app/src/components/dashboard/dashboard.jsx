@@ -12,7 +12,10 @@ export default function Dashboard() {
     <div className="min-h-screen bg-ink-cream">
       {/* Header */}
       <Header />
-      <AppMetaTags />
+      <AppMetaTags 
+       title="My Writing Space"
+       description="Showing up, one sprint at a time."
+      />
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
         {/* Desktop: 2 Column Layout, Mobile: Stack */}

@@ -84,9 +84,14 @@ export default function Homepage() {
 
   return (
     <div className="min-h-screen bg-ink-cream">
+
+      <AppMetaTags 
+       title="Inkwell - Just Write"
+       description="The easiest way to show up and write. No judgment, just progress."
+    />
+
       {/* Header */}
       <Header />
-       <AppMetaTags />
       {/* Push notifications setup (runs only if user exists) */}
       <NotificationsSetup user={user} />
 

@@ -1,69 +1,59 @@
-import { Helmet } from 'react-helmet-async';
+import { useEffect } from 'react';
 
 /**
- * Meta Tags Component for Social Sharing
- * Use this in your pages to create rich link previews
+ * Simple Meta Tags without external dependencies
+ * Works with React 19 - no package conflicts!
  */
 
-// For main app pages
-export function AppMetaTags({ title, description, image }) {
+export function AppMetaTags({ title, description, image } = {}) {
   const defaultTitle = "Inkwell - Just Write";
   const defaultDescription = "Show up. Write messy. Build the habit. No perfection required.";
-  const defaultImage = `${window.location.origin}/og-default.png`; // Create this image
+  const defaultImage = `${window.location.origin}/og-default.png`;
 
-  return (
-    <Helmet>
-      {/* Primary Meta Tags */}
-      <title>{title || defaultTitle}</title>
-      <meta name="title" content={title || defaultTitle} />
-      <meta name="description" content={description || defaultDescription} />
+  useEffect(() => {
+    // Update title
+    document.title = title || defaultTitle;
 
-      {/* Open Graph / Facebook */}
-      <meta property="og:type" content="website" />
-      <meta property="og:url" content={window.location.href} />
-      <meta property="og:title" content={title || defaultTitle} />
-      <meta property="og:description" content={description || defaultDescription} />
-      <meta property="og:image" content={image || defaultImage} />
+    // Update or create meta tags
+    updateMetaTag('name', 'description', description || defaultDescription);
+    updateMetaTag('property', 'og:title', title || defaultTitle);
+    updateMetaTag('property', 'og:description', description || defaultDescription);
+    updateMetaTag('property', 'og:image', image || defaultImage);
+    updateMetaTag('property', 'og:url', window.location.href);
+    updateMetaTag('property', 'og:type', 'website');
+    
+    updateMetaTag('property', 'twitter:card', 'summary_large_image');
+    updateMetaTag('property', 'twitter:title', title || defaultTitle);
+    updateMetaTag('property', 'twitter:description', description || defaultDescription);
+    updateMetaTag('property', 'twitter:image', image || defaultImage);
+  }, [title, description, image]);
 
-      {/* Twitter */}
-      <meta property="twitter:card" content="summary_large_image" />
-      <meta property="twitter:url" content={window.location.href} />
-      <meta property="twitter:title" content={title || defaultTitle} />
-      <meta property="twitter:description" content={description || defaultDescription} />
-      <meta property="twitter:image" content={image || defaultImage} />
-    </Helmet>
-  );
+  return null; // This component doesn't render anything
 }
 
-// For individual quote pages
 export function QuoteMetaTags({ quote }) {
   const title = `"${quote.content.substring(0, 60)}${quote.content.length > 60 ? '...' : ''}"`;
   const description = quote.title 
     ? `${quote.content} — ${quote.title}`
     : quote.content;
 
-  return (
-    <Helmet>
-      <title>{title}</title>
-      <meta name="title" content={title} />
-      <meta name="description" content={description} />
+  useEffect(() => {
+    document.title = title;
 
-      <meta property="og:type" content="article" />
-      <meta property="og:url" content={window.location.href} />
-      <meta property="og:title" content={title} />
-      <meta property="og:description" content={description} />
-      <meta property="og:image" content={`${window.location.origin}/api/quote/${quote.id}/image`} />
+    updateMetaTag('name', 'description', description);
+    updateMetaTag('property', 'og:title', title);
+    updateMetaTag('property', 'og:description', description);
+    updateMetaTag('property', 'og:url', window.location.href);
+    updateMetaTag('property', 'og:type', 'article');
+    
+    updateMetaTag('property', 'twitter:card', 'summary_large_image');
+    updateMetaTag('property', 'twitter:title', title);
+    updateMetaTag('property', 'twitter:description', description);
+  }, [quote]);
 
-      <meta property="twitter:card" content="summary_large_image" />
-      <meta property="twitter:url" content={window.location.href} />
-      <meta property="twitter:title" content={title} />
-      <meta property="twitter:description" content={description} />
-      <meta property="twitter:image" content={`${window.location.origin}/api/quote/${quote.id}/image`} />
-    </Helmet>
-  );
+  return null;
 }
 
-// For progress share pages (if you create dedicated pages)
 export function ProgressMetaTags({ type, stats }) {
   const title = type === 'daily' 
     ? `Today's Writing: ${stats.sprintsCompleted} sprint${stats.sprintsCompleted !== 1 ? 's' : ''}, ${stats.wordsWritten.toLocaleString()} words`
@@ -73,21 +63,52 @@ export function ProgressMetaTags({ type, stats }) {
     ? `I'm building a consistent writing habit. Join me!`
     : `My weekly writing progress. Every word counts!`;
 
-  return (
-    <Helmet>
-      <title>{title}</title>
-      <meta name="title" content={title} />
-      <meta name="description" content={description} />
+  useEffect(() => {
+    document.title = title;
 
-      <meta property="og:type" content="website" />
-      <meta property="og:url" content={window.location.href} />
-      <meta property="og:title" content={title} />
-      <meta property="og:description" content={description} />
+    updateMetaTag('name', 'description', description);
+    updateMetaTag('property', 'og:title', title);
+    updateMetaTag('property', 'og:description', description);
+    updateMetaTag('property', 'og:url', window.location.href);
+    
+    updateMetaTag('property', 'twitter:card', 'summary_large_image');
+    updateMetaTag('property', 'twitter:title', title);
+    updateMetaTag('property', 'twitter:description', description);
+  }, [type, stats]);
 
-      <meta property="twitter:card" content="summary_large_image" />
-      <meta property="twitter:url" content={window.location.href} />
-      <meta property="twitter:title" content={title} />
-      <meta property="twitter:description" content={description} />
-    </Helmet>
-  );
+  return null;
 }
+
+// Helper function to update or create meta tags
+function updateMetaTag(attr, key, content) {
+  if (!content) return;
+
+  let element = document.querySelector(`meta[${attr}="${key}"]`);
+  
+  if (!element) {
+    element = document.createElement('meta');
+    element.setAttribute(attr, key);
+    document.head.appendChild(element);
+  }
+  
+  element.setAttribute('content', content);
+}
+
+/**
+ * Usage (EXACTLY THE SAME as before):
+ * 
+ * // In Homepage:
+ * <AppMetaTags 
+ *   title="Inkwell - Start Writing Now"
+ *   description="The easiest way to show up and write. No judgment, just progress."
+ * />
+ * 
+ * // In Dashboard:
+ * <AppMetaTags 
+ *   title="My Writing Space"
+ *   description="Showing up, one sprint at a time."
+ * />
+ * 
+ * // Default:
+ * <AppMetaTags />
+ */
