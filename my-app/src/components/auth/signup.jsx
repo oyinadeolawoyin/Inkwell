@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./authContext";
 import API_URL from "../../config/api";
 import { 
     EyeIcon, EyeOffIcon
 } from "lucide-react";
+import TimezoneSelect from 'react-timezone-select';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -14,11 +15,18 @@ export default function Signup() {
     username: "",
     email: "",
     password: "",
+    timezone: "",
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState("");
+
+  // Auto-detect timezone on component mount
+  useEffect(() => {
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setFormData(prev => ({ ...prev, timezone: detected }));
+  }, []);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -98,6 +106,7 @@ export default function Signup() {
               onChange={handleChange}
               className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border border-ink-lightgray input-focus bg-white text-ink-gray placeholder-gray-400 transition-all"
               placeholder="Your pen name"
+              required
               disabled={isLoading}
             />
           </div>
@@ -118,6 +127,7 @@ export default function Signup() {
               onChange={handleChange}
               className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border border-ink-lightgray input-focus bg-white text-ink-gray placeholder-gray-400 transition-all"
               placeholder="you@example.com"
+              required
               disabled={isLoading}
             />
           </div>
@@ -131,13 +141,14 @@ export default function Signup() {
                 Password
             </label>
             <input
-                type={showPassword ? "text" : "password"} // toggle here
+                type={showPassword ? "text" : "password"}
                 id="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 className="w-full px-3 py-2 sm:px-4 sm:py-3 pr-10 text-sm sm:text-base rounded-lg border border-ink-lightgray input-focus bg-white text-ink-gray placeholder-gray-400 transition-all"
                 placeholder="At least 6 characters"
+                required
                 disabled={isLoading}
             />
             
@@ -147,8 +158,27 @@ export default function Signup() {
                 onClick={() => setShowPassword(prev => !prev)}
                 className="absolute right-2 sm:right-3 top-8 sm:top-9 text-gray-400 hover:text-gray-700 p-1"
             >
-                {showPassword ? "🙈" : "👁️"} {/* you can use icons instead of emoji */}
+                {showPassword ? "🙈" : "👁️"}
             </button>
+          </div>
+
+          {/* Timezone */}
+          <div>
+            <label 
+              htmlFor="timezone" 
+              className="block text-xs sm:text-sm font-medium text-ink-primary mb-1 sm:mb-2"
+            >
+              Your timezone <span className="text-red-500">*</span>
+            </label>
+            <TimezoneSelect
+              value={formData.timezone}
+              onChange={(tz) => setFormData(prev => ({ ...prev, timezone: tz.value }))}
+              className="text-sm sm:text-base"
+              disabled={isLoading}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              💡 We auto-detected your timezone. Change it if incorrect.
+            </p>
           </div>
 
           {/* Submit Button */}
