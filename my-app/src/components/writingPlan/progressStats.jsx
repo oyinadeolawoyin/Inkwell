@@ -227,11 +227,11 @@ export default function ProgressStats() {
               )}
 
               {/* Watermark */}
-              <div className="text-center pt-2">
+              {/* <div className="text-center pt-2">
                 <span className="text-xs text-gray-400">
                   {window.location.hostname}
                 </span>
-              </div>
+              </div> */}
             </div>
           ) : (
             <div className="text-center py-6">
