@@ -1,6 +1,6 @@
 import Header from "../profile/header";
 
-export default function ProfileWorkInProgress() {
+export default function Profile() {
   return (
     <div className="min-h-screen bg-ink-cream">
       <Header />
