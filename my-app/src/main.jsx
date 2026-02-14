@@ -14,7 +14,7 @@ import ActiveSprint from './components/sprint/workspace';
 import StartSprint from './components/sprint/startSprint';
 import Notification from './components/notification/notification';
 import Profile from './components/profile/profile';
-import EditProfile from './components/profile/editProfile';
+// import EditProfile from './components/profile/editProfile';
 import App from './App'
 
 if ("serviceWorker" in navigator) {
@@ -54,10 +54,10 @@ const router = createBrowserRouter([
      
     // ]
   },
-  {
-    path: "/profile/edit",
-    element: <EditProfile />
-  },
+  // {
+  //   path: "/profile/edit",
+  //   element: <EditProfile />
+  // },
   {
     path: "/sprint/:sprintId",
     element: <ActiveSprint />,
