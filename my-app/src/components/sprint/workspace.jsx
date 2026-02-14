@@ -38,9 +38,9 @@ export default function ActiveSprint() {
 
       if (remaining <= 0) {
         setTimeLeft(0);
-        playNotificationSound();
         setShowCompleteModal(true);
         clearInterval(interval);
+        playNotificationSound();
       } else {
         setTimeLeft(remaining);
       }
