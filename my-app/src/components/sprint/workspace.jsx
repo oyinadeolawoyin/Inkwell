@@ -15,6 +15,30 @@ export default function ActiveSprint() {
   const [isPaused, setIsPaused] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [audioElement, setAudioElement] = useState(null);
+
+  // Preload audio on component mount
+  useEffect(() => {
+    const audio = new Audio('/notification.mp3');
+    audio.preload = 'auto';
+    audio.volume = 0.5;
+    setAudioElement(audio);
+    
+    // Unlock audio on first user interaction (for iOS/Safari)
+    const unlockAudio = () => {
+      audio.play().then(() => audio.pause()).catch(() => {});
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+    
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+    
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
 
   // Fetch my sprint on load
   useEffect(() => {
@@ -37,17 +61,23 @@ export default function ActiveSprint() {
       const remaining = (mySprint.duration * 60) - elapsed;
 
       if (remaining <= 0) {
-        setTimeLeft(0);
-        setShowCompleteModal(true);
-        clearInterval(interval);
+        // CRITICAL: Play audio FIRST before any state updates
         playNotificationSound();
+        
+        // Small delay to ensure audio starts before state updates
+        setTimeout(() => {
+          setTimeLeft(0);
+          setShowCompleteModal(true);
+        }, 100);
+        
+        clearInterval(interval);
       } else {
         setTimeLeft(remaining);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [mySprint, isPaused]);
+  }, [mySprint, isPaused, audioElement]);
 
   async function fetchMySprint() {
     try {
@@ -112,11 +142,30 @@ export default function ActiveSprint() {
   }
 
   function playNotificationSound() {
+    // Try to play the preloaded audio first
+    if (audioElement) {
+      audioElement.currentTime = 0;
+      audioElement.play().catch(err => {
+        console.log('Preloaded audio failed:', err);
+        // Fallback to creating new audio
+        tryFallbackAudio();
+      });
+    } else {
+      // Fallback if audio wasn't preloaded
+      tryFallbackAudio();
+    }
+  }
+  
+  function tryFallbackAudio() {
     try {
       const audio = new Audio('/notification.mp3');
       audio.volume = 0.5;
-      audio.play().catch(() => {});
-    } catch (e) {}
+      audio.play().catch(err => {
+        console.log('Audio playback failed:', err);
+      });
+    } catch (e) {
+      console.log('Audio creation failed:', e);
+    }
   }
 
   function formatTime(seconds) {

@@ -136,7 +136,7 @@ export default function Header() {
                         </div>
                         
                         <Link
-                          to="/profile"
+                          to={`/profile/${user.id}`}
                           className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
                           onClick={() => setShowDropdown(false)}
                         >
@@ -219,7 +219,7 @@ export default function Header() {
                       </div>
                       
                       <Link
-                        to="/profile"
+                        to={`/profile/${user.id}`}
                         className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
                         onClick={() => setShowDropdown(false)}
                       >
