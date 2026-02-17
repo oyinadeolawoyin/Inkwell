@@ -15,17 +15,34 @@ const DURATIONS = [
   { value: 60, label: "60 min", description: "Marathon session" },
 ];
 
+// Retry a fetch up to `retries` times with a delay between attempts
+async function fetchWithRetry(url, options = {}, retries = 3, delayMs = 2000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      return res;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 export default function StartSprint() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [checkin, setCheckin] = useState("");
   const [duration, setDuration] = useState(25);
   const [isLoading, setIsLoading] = useState(false);
+  const [serverWaking, setServerWaking] = useState(false);
+  const [error, setError] = useState(null);
   const [todayStats, setTodayStats] = useState(null);
 
+  // Ping server on mount so Render wakes up before user hits Start
   useEffect(() => {
-    fetchTodayStats();
-  }, []);
+    fetch(`${API_URL}/health`, { credentials: "include" }).catch(() => {});
+    if (user) fetchTodayStats();
+  }, [user]);
 
   async function fetchTodayStats() {
     try {
@@ -43,34 +60,110 @@ export default function StartSprint() {
 
   async function handleStartSprint(e) {
     e.preventDefault();
-
     setIsLoading(true);
+    setError(null);
+
+    const wakingTimer = setTimeout(() => setServerWaking(true), 3000);
 
     try {
-      const res = await fetch(`${API_URL}/sprint/startSprint`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          duration,
-          checkin: checkin.trim() || null,
-        }),
-      });
+      const res = await fetchWithRetry(
+        `${API_URL}/sprint/startSprint`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            duration,
+            checkin: checkin.trim() || null,
+          }),
+        },
+        3,
+        3000
+      );
 
       if (res.ok) {
         const data = await res.json();
         navigate(`/sprint/${data.sprint.id}`);
+      } else if (res.status === 401) {
+        setError("Your session expired. Please sign in again.");
+        setTimeout(() => navigate("/auth/login"), 2000);
       } else {
-        alert("Failed to start sprint. Please try again.");
+        const body = await res.json().catch(() => ({}));
+        setError(body.message || "Failed to start sprint. Please try again.");
       }
-    } catch (error) {
-      console.error("Start sprint error:", error);
-      alert("Something went wrong. Please try again.");
+    } catch (err) {
+      console.error("Start sprint error:", err);
+      setError("Could not reach the server. Please check your connection and try again.");
     } finally {
+      clearTimeout(wakingTimer);
+      setServerWaking(false);
       setIsLoading(false);
     }
   }
 
+  // ── Auth loading ────────────────────────────────────────────────────
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-ink-cream flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-ink-primary border-t-transparent mb-4"></div>
+          <p className="text-ink-gray text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Not signed in ───────────────────────────────────────────────────
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-ink-cream">
+        <Header />
+        <main className="max-w-md mx-auto px-4 sm:px-6 py-16 sm:py-24">
+          <div className="bg-white rounded-2xl shadow-soft-lg p-8 sm:p-10 border-l-4 border-ink-gold text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-ink-cream rounded-full mb-6">
+              <svg className="w-8 h-8 text-ink-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+
+            <h2 className="text-2xl sm:text-3xl font-serif text-ink-primary mb-3">
+              Sign in to start writing
+            </h2>
+            <p className="text-ink-gray text-sm sm:text-base mb-8 leading-relaxed">
+              You need an account to start a sprint. Join writers who show up every day — one sprint at a time.
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => navigate("/login")}
+                className="w-full py-3 px-6 bg-ink-primary text-white font-medium rounded-xl
+                         hover:bg-opacity-90 transition-all shadow-soft
+                         focus:outline-none focus:ring-2 focus:ring-ink-gold focus:ring-offset-2"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => navigate("/signup")}
+                className="w-full py-3 px-6 bg-white border-2 border-ink-lightgray text-ink-primary
+                         font-medium rounded-xl hover:border-ink-primary transition-all"
+              >
+                Create an Account — it's free
+              </button>
+            </div>
+
+            <button
+              onClick={() => navigate("/")}
+              className="mt-6 text-xs text-gray-400 hover:text-ink-gray transition-colors"
+            >
+              ← Back to home
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ── Signed in — sprint form ─────────────────────────────────────────
   return (
     <div className="min-h-screen bg-ink-cream">
       <Header />
@@ -164,12 +257,32 @@ export default function StartSprint() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Starting...
+                  {serverWaking ? "Waking server, hang tight..." : "Starting..."}
                 </span>
               ) : (
                 "Start Writing"
               )}
             </button>
+
+            {/* Error message */}
+            {error && (
+              <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Waking server notice */}
+            {serverWaking && (
+              <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+                <svg className="w-5 h-5 mt-0.5 flex-shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>The server is waking up after a period of inactivity — this only takes a few seconds. Your sprint will start shortly!</span>
+              </div>
+            )}
           </form>
         </div>
 
