@@ -58,7 +58,14 @@ export default function Signup() {
         localStorage.setItem("user", JSON.stringify(data.user));
         navigate("/welcome"); // Redirect after successful signup
       } else {
-        setServerError(data.message || "Something went wrong. Please try again.");
+        // Handle both array of errors and single message
+        if (data.errors && Array.isArray(data.errors)) {
+          // Multiple validation errors - show them as a list
+          setServerError(data.errors.join(" "));
+        } else {
+          // Single error message
+          setServerError(data.message || "Something went wrong. Please try again.");
+        }
       }
     } catch (error) {
       setServerError("Couldn't connect. Check your internet?");
@@ -84,7 +91,17 @@ export default function Signup() {
         {/* Server Error */}
         {serverError && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 sm:px-4 sm:py-3 rounded-lg mb-4">
-            <p className="text-xs sm:text-sm">{serverError}</p>
+            {serverError.includes('.') && serverError.split('.').length > 2 ? (
+              // Multiple errors - show as bullet points
+              <ul className="text-xs sm:text-sm list-disc list-inside space-y-1">
+                {serverError.split('.').filter(err => err.trim()).map((error, i) => (
+                  <li key={i}>{error.trim()}</li>
+                ))}
+              </ul>
+            ) : (
+              // Single error - show as text
+              <p className="text-xs sm:text-sm">{serverError}</p>
+            )}
           </div>
         )}
 
