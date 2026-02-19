@@ -56,20 +56,20 @@ export default function ActiveSprint() {
   useEffect(() => {
     if (!mySprint || isPaused) return;
 
+    // On resume (or first start), snapshot what timeLeft currently is and when we resumed
+    const resumedAt = Date.now();
+    const timeLeftAtResume = timeLeft;
+
     const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - new Date(mySprint.startedAt).getTime()) / 1000);
-      const remaining = (mySprint.duration * 60) - elapsed;
+      const secondsElapsedSinceResume = Math.floor((Date.now() - resumedAt) / 1000);
+      const remaining = timeLeftAtResume - secondsElapsedSinceResume;
 
       if (remaining <= 0) {
-        // CRITICAL: Play audio FIRST before any state updates
         playNotificationSound();
-        
-        // Small delay to ensure audio starts before state updates
         setTimeout(() => {
           setTimeLeft(0);
           setShowCompleteModal(true);
         }, 100);
-        
         clearInterval(interval);
       } else {
         setTimeLeft(remaining);
@@ -90,6 +90,10 @@ export default function ActiveSprint() {
         if (data.sprint && data.sprint.isActive) {
           setMySprint(data.sprint);
           setIsPaused(data.sprint.isPause || false);
+          // Set initial timeLeft from server data
+          const elapsed = Math.floor((Date.now() - new Date(data.sprint.startedAt).getTime()) / 1000);
+          const remaining = (data.sprint.duration * 60) - elapsed;
+          setTimeLeft(Math.max(0, remaining));
         } else {
           navigate("/dashboard");
         }

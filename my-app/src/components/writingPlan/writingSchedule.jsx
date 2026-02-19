@@ -34,8 +34,17 @@ export default function WritingSchedule() {
         
         // Handle nested writingPlan object
         const planData = data.writingPlan || data;
-        setPlan(planData);
+
+        // Treat the plan as "not set" if no day has a real time value.
+        // Backend may return a plan row with all times as null/""/00:00.
+        const hasAnyDaySet = DAYS.some(day => {
+          const time = planData[`${day.key}Time`];
+          return time !== null && time !== undefined && time !== "" && time !== "00:00";
+        });
+
+        setPlan(hasAnyDaySet ? planData : null);
       }
+      // Non-ok response (404, etc.) → plan stays null → show CTA
     } catch (error) {
       console.error("Failed to fetch plan:", error);
     } finally {
@@ -60,28 +69,38 @@ export default function WritingSchedule() {
   // No plan set yet
   if (!plan) {
     return (
-      <div className="bg-gradient-to-br from-[#fafaf9] to-white rounded-2xl shadow-sm border border-[#e5e5e4] p-6 sm:p-8 text-center">
-        <div className="text-4xl sm:text-5xl mb-4">📅</div>
-        <h3 className="text-lg sm:text-xl font-serif font-bold text-[#2d3748] mb-2">
-          Set Your Writing Schedule
-        </h3>
-        <p className="text-sm sm:text-base text-[#6b6b6b] mb-6 max-w-md mx-auto">
-          Pick the days you want to write. Having a plan makes it easier to build the habit.
-        </p>
-        <button 
-          onClick={() => navigate("/setup-plan")}
-          className="btn-primary text-sm sm:text-base px-6 py-2.5 sm:px-8 sm:py-3"
-        >
-          Create Your Plan
-        </button>
+      <div className="bg-gradient-to-br from-[#fafaf9] to-white rounded-2xl shadow-sm border border-[#e5e5e4] p-6 sm:p-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-serif font-bold text-[#2d3748] mb-1">
+              Your Writing Days
+            </h2>
+            <p className="text-sm sm:text-base text-[#6b6b6b]">No schedule set yet</p>
+          </div>
+        </div>
+        <div className="flex flex-col items-center text-center py-6 px-4 bg-amber-50 border border-amber-200 rounded-2xl">
+          <div className="text-4xl sm:text-5xl mb-4">📅</div>
+          <h3 className="text-base sm:text-lg font-semibold text-[#2d3748] mb-2">
+            Schedule your writing plan
+          </h3>
+          <p className="text-sm text-[#6b6b6b] mb-5 max-w-xs">
+            Pick your writing days and times to get weekly progress reminders and stay on track.
+          </p>
+          <button
+            onClick={() => navigate("/setup-plan")}
+            className="btn-primary text-sm sm:text-base px-6 py-2.5 sm:px-8 sm:py-3"
+          >
+            Set Up Schedule
+          </button>
+        </div>
       </div>
     );
   }
 
-  // Get only the days that are selected (NOT null)
+  // Get only the days that are genuinely selected (non-null, non-empty time)
   const selectedDays = DAYS.filter(day => {
     const time = plan[`${day.key}Time`];
-    return time !== null;
+    return time !== null && time !== undefined && time !== "" && time !== "00:00";
   }).map(day => ({
     ...day,
     goal: plan[`${day.key}Goal`], // may be 0, and that’s fine

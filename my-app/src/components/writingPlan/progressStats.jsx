@@ -107,9 +107,8 @@ export default function ProgressStats() {
     );
   }
 
-  const hasNoProgress = 
-    weeklyProgress?.completedPlannedDays === 0 && 
-    weeklyProgress?.bonusDays === 0;
+  // No progress = no sprints completed at all this week
+  const hasNoProgress = weeklyProgress?.totalSprints === 0;
 
   if (hasNoProgress) {
     return (
@@ -324,17 +323,21 @@ export default function ProgressStats() {
             )}
           </div>
 
-          {/* Encouragement */}
-          {weeklyProgress?.completedPlannedDays > 0 && (
+          {/* Encouragement — show for both planned and bonus-only writers */}
+          {(weeklyProgress?.totalSprints > 0) && (
             <div className="pt-4 border-t border-ink-cream">
               <p className="text-sm text-ink-gray italic text-center">
-                {weeklyPercentage === 100
-                  ? "🎉 You crushed it this week!"
-                  : weeklyPercentage >= 75
-                  ? "💪 You're doing great!"
-                  : weeklyPercentage >= 50
-                  ? "🌱 You're showing up. That's what matters."
-                  : "Every word counts. Keep going!"}
+                {weeklyProgress?.plannedDays > 0
+                  ? weeklyPercentage === 100
+                    ? "🎉 You crushed it this week!"
+                    : weeklyPercentage >= 75
+                    ? "💪 You're doing great!"
+                    : weeklyPercentage >= 50
+                    ? "🌱 You're showing up. That's what matters."
+                    : "Every word counts. Keep going!"
+                  : weeklyProgress?.bonusDays > 1
+                  ? "🔥 Writing beyond the plan. Incredible!"
+                  : "✨ You showed up. That's what matters most."}
               </p>
             </div>
           )}
