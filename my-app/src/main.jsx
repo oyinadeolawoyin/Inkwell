@@ -8,10 +8,14 @@ import { AuthProvider } from './components/auth/authContext'
 import Signup from './components/auth/signup';
 import Login from './components/auth/login';
 import Welcome from './components/auth/welcome';
+
 import SetupPlan from './components/writingPlan/setupPlan';
 import Dashboard from './components/dashboard/dashboard';
+
 import ActiveSprint from './components/sprint/workspace';
 import StartSprint from './components/sprint/startSprint';
+import GroupSprintWorkspace from './components/sprint/groupSprintWorkspace';
+
 import Notification from './components/notification/notification';
 import Profile from './components/profile/profile';
 // import EditProfile from './components/profile/editProfile';
@@ -65,6 +69,10 @@ const router = createBrowserRouter([
   {
     path: "/start-sprint",
     element: <StartSprint />
+  },
+  {
+    path: "group-sprint/:groupSprintId",
+    element: <GroupSprintWorkspace />
   },
   {
     path: "/notifications",
