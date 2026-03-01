@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { useState, useEffect } from "react";
 import API_URL from "@/config/api";
@@ -6,6 +6,7 @@ import API_URL from "@/config/api";
 export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [showDropdown, setShowDropdown] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
 
@@ -17,7 +18,7 @@ export default function Header() {
       return () => clearInterval(interval);
     }
   }, [user]);
-  
+
   async function fetchNotificationCount() {
     try {
       const res = await fetch(`${API_URL}/notifications`, {
@@ -46,8 +47,8 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo */}
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
             <span className="text-2xl sm:text-3xl">🖋️</span>
@@ -56,19 +57,29 @@ export default function Header() {
             </h1>
           </Link>
 
-          {/* Not Authenticated - Show Sign In */}
+          {/* Not Authenticated */}
           {!user ? (
-            <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-5">
+              <Link
+                to="/about"
+                className={`text-sm font-medium transition-colors ${
+                  pathname === "/about"
+                    ? "text-ink-primary"
+                    : "text-ink-lightgray hover:text-ink-primary"
+                }`}
+              >
+                About
+              </Link>
               <Link
                 to="/login"
-                className="text-sm sm:text-base text-ink-gray hover:text-ink-primary transition-colors font-medium"
+                className="hidden sm:inline text-sm text-ink-gray hover:text-ink-primary transition-colors font-medium"
               >
                 Sign In
               </Link>
               <Link
                 to="/signup"
                 className="px-4 sm:px-6 py-2 sm:py-2.5 bg-ink-primary text-white rounded-lg font-medium
-                         hover:bg-opacity-90 transition-all shadow-soft text-sm sm:text-base"
+                         hover:bg-opacity-90 transition-all shadow-soft text-sm"
               >
                 Get Started
               </Link>
@@ -78,7 +89,7 @@ export default function Header() {
               {/* Authenticated - Desktop */}
               <div className="hidden sm:flex items-center gap-4 lg:gap-6">
                 {/* Notification Bell with Badge */}
-                <Link 
+                <Link
                   to="/notifications"
                   className="relative p-2 text-ink-gray hover:text-ink-primary transition-colors rounded-lg hover:bg-ink-cream"
                   aria-label="Notifications"
@@ -109,10 +120,10 @@ export default function Header() {
                       {user?.username}
                     </span>
                     {/* Dropdown arrow */}
-                    <svg 
+                    <svg
                       className={`w-4 h-4 text-ink-gray transition-transform ${showDropdown ? 'rotate-180' : ''}`}
-                      fill="none" 
-                      stroke="currentColor" 
+                      fill="none"
+                      stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -123,18 +134,18 @@ export default function Header() {
                   {showDropdown && (
                     <>
                       {/* Backdrop */}
-                      <div 
-                        className="fixed inset-0 z-10" 
+                      <div
+                        className="fixed inset-0 z-10"
                         onClick={() => setShowDropdown(false)}
                       />
-                      
+
                       {/* Menu */}
                       <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-soft-lg border border-ink-lightgray z-20 py-2">
                         <div className="px-4 py-3 border-b border-ink-lightgray">
                           <p className="text-sm font-medium text-ink-primary">{user?.username}</p>
                           <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                         </div>
-                        
+
                         <Link
                           to={`/profile/${user.id}`}
                           className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
@@ -142,7 +153,7 @@ export default function Header() {
                         >
                           Profile
                         </Link>
-                        
+
                         <Link
                           to="/dashboard"
                           className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
@@ -150,7 +161,15 @@ export default function Header() {
                         >
                           Dashboard
                         </Link>
-                        
+
+                        <Link
+                          to="/about"
+                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                          onClick={() => setShowDropdown(false)}
+                        >
+                          About
+                        </Link>
+
                         <div className="border-t border-ink-lightgray mt-2 pt-2">
                           <button
                             onClick={handleLogout}
@@ -168,22 +187,22 @@ export default function Header() {
               {/* Authenticated - Mobile */}
               <div className="flex sm:hidden items-center gap-3 relative">
                 {/* Notification Bell - Mobile */}
-                <Link 
+                <Link
                   to="/notifications"
                   className="relative p-2 text-ink-gray hover:text-ink-primary transition-colors"
                   aria-label="Notifications"
                 >
-                  <svg 
-                    className="w-5 h-5" 
-                    fill="none" 
-                    stroke="currentColor" 
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={2} 
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" 
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                     />
                   </svg>
                   {/* Notification Badge - Mobile */}
@@ -206,18 +225,18 @@ export default function Header() {
                 {showDropdown && (
                   <>
                     {/* Backdrop */}
-                    <div 
-                      className="fixed inset-0 z-10" 
+                    <div
+                      className="fixed inset-0 z-10"
                       onClick={() => setShowDropdown(false)}
                     />
-                    
+
                     {/* Menu */}
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-soft-lg border border-ink-lightgray z-20 py-2 top-full">
                       <div className="px-4 py-3 border-b border-ink-lightgray">
                         <p className="text-sm font-medium text-ink-primary">{user?.username}</p>
                         <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                       </div>
-                      
+
                       <Link
                         to={`/profile/${user.id}`}
                         className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
@@ -225,7 +244,7 @@ export default function Header() {
                       >
                         Profile
                       </Link>
-                      
+
                       <Link
                         to="/dashboard"
                         className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
@@ -233,7 +252,15 @@ export default function Header() {
                       >
                         Dashboard
                       </Link>
-                      
+
+                      <Link
+                        to="/about"
+                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        About
+                      </Link>
+
                       <div className="border-t border-ink-lightgray mt-2 pt-2">
                         <button
                           onClick={handleLogout}
