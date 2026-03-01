@@ -376,6 +376,7 @@ export default function ActiveSprint() {
 
 // Sprint Complete Modal
 function SprintCompleteModal({ sprintId, onClose }) {
+  const [endWordCount, setEndWordCount] = useState("");
   const [wordsWritten, setWordsWritten] = useState("");
   const [checkout, setCheckout] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -389,14 +390,23 @@ function SprintCompleteModal({ sprintId, onClose }) {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          wordsWritten: wordsWritten ? Number(wordsWritten) : 0,
+          endWordCount: endWordCount ? Number(endWordCount) : null,
           checkout: checkout.trim() || null,
         }),
       });
 
-      if (res.ok) {
-        onClose();
+      if (!res.ok) return;
+
+      if (wordsWritten) {
+        await fetch(`${API_URL}/sprint/${sprintId}/words`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ wordsWritten: Number(wordsWritten) }),
+        });
       }
+
+      onClose();
     } catch (error) {
       console.error("Failed to complete sprint:", error);
     } finally {
@@ -419,19 +429,51 @@ function SprintCompleteModal({ sprintId, onClose }) {
         </div>
 
         {/* Word Count */}
-        <div className="mb-5">
-          <label htmlFor="words" className="block text-sm font-medium text-ink-primary mb-2">
-            How many words did you write? <span className="text-gray-500">(optional)</span>
+        <div className="mb-3">
+          <label htmlFor="endWordCount" className="block text-sm font-medium text-ink-primary mb-1">
+            What's your total word count now? <span className="text-gray-500">(optional)</span>
           </label>
+          <p className="text-xs text-gray-400 mb-2">
+            Your document's current total. We'll subtract your starting count to calculate what you wrote this sprint.
+          </p>
           <input
             type="number"
-            id="words"
-            value={wordsWritten}
-            onChange={(e) => setWordsWritten(e.target.value)}
-            placeholder="342"
+            id="endWordCount"
+            value={endWordCount}
+            onChange={(e) => { setEndWordCount(e.target.value); if (e.target.value) setWordsWritten(""); }}
+            placeholder="e.g. 3742"
             min="0"
+            disabled={!!wordsWritten}
             className="w-full px-4 py-3 rounded-lg border border-ink-lightgray
-                     focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all"
+                     focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all
+                     disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 my-3">
+          <div className="flex-1 h-px bg-ink-lightgray"></div>
+          <span className="text-xs text-gray-400 font-medium">OR</span>
+          <div className="flex-1 h-px bg-ink-lightgray"></div>
+        </div>
+
+        <div className="mb-5">
+          <label htmlFor="wordsWritten" className="block text-sm font-medium text-ink-primary mb-1">
+            How many words did you write this sprint? <span className="text-gray-500">(optional)</span>
+          </label>
+          <p className="text-xs text-gray-400 mb-2">
+            Use this if you didn't track your starting word count.
+          </p>
+          <input
+            type="number"
+            id="wordsWritten"
+            value={wordsWritten}
+            onChange={(e) => { setWordsWritten(e.target.value); if (e.target.value) setEndWordCount(""); }}
+            placeholder="e.g. 342"
+            min="0"
+            disabled={!!endWordCount}
+            className="w-full px-4 py-3 rounded-lg border border-ink-lightgray
+                     focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all
+                     disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
           />
         </div>
 

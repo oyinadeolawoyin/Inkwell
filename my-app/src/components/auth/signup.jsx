@@ -68,7 +68,7 @@ export default function Signup() {
         }
       }
     } catch (error) {
-      setServerError("Couldn't connect. Check your internet?");
+      setServerError("We couldn't connect to the server. Please check your internet connection and try again.");
     } finally {
       setIsLoading(false);
     }

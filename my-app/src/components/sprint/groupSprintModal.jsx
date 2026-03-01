@@ -43,13 +43,14 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   const [duration, setDuration] = useState(25);
   const [intro, setIntro] = useState("");
   const [checkin, setCheckin] = useState("");
+  const [startWordCount, setStartWordCount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [groupSprint, setGroupSprint] = useState(null);
 
   function handleClose() {
     setStep(1); setPurpose(""); setDuration(25);
-    setIntro(""); setCheckin(""); setError(null); setGroupSprint(null);
+    setIntro(""); setCheckin(""); setStartWordCount(""); setError(null); setGroupSprint(null);
     onClose();
   }
 
@@ -63,8 +64,8 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
         body: JSON.stringify({ sprintPurpose: purpose.trim(), duration }),
       });
       if (res.ok) { const data = await res.json(); setGroupSprint(data.groupSprint); setStep(2); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "Failed to create group sprint."); }
-    } catch { setError("Could not reach the server."); }
+      else { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't create the group sprint. Please try again."); }
+    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
     finally { setIsLoading(false); }
   }
 
@@ -78,11 +79,12 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
           intro: intro.trim() || null,
           checkin: checkin.trim() || null,
           groupSprintId: groupSprint.id,
+          startWordCount: startWordCount ? Number(startWordCount) : 0,
         }),
       });
       if (res.ok) { const data = await res.json(); onCreated(groupSprint, data.sprint); handleClose(); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "Failed to start sprint."); }
-    } catch { setError("Could not reach the server."); }
+      else { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't start the sprint. Please try again."); }
+    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
     finally { setIsLoading(false); }
   }
 
@@ -183,6 +185,21 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
               <p className="mt-1 text-xs text-gray-400 text-right">{checkin.length}/200</p>
             </div>
 
+            {/* Start word count */}
+            <div>
+              <label className="block text-sm font-medium text-ink-primary mb-1">
+                What's your current word count? <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <p className="text-xs text-gray-400 mb-2">
+                We'll use this to calculate how many words you add this sprint.
+              </p>
+              <input
+                type="number" value={startWordCount} onChange={(e) => setStartWordCount(e.target.value)}
+                placeholder="e.g. 3400" min={0}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream"
+              />
+            </div>
+
             <ErrorBanner message={error} />
             <div className="flex gap-3 pt-1">
               <button type="button" onClick={() => { setStep(1); setError(null); }}
@@ -209,10 +226,11 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
 export function JoinGroupSprintModal({ isOpen, onClose, onJoined, groupSprint }) {
   const [intro, setIntro] = useState("");
   const [checkin, setCheckin] = useState("");
+  const [startWordCount, setStartWordCount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  function handleClose() { setIntro(""); setCheckin(""); setError(null); onClose(); }
+  function handleClose() { setIntro(""); setCheckin(""); setStartWordCount(""); setError(null); onClose(); }
 
   async function handleJoin(e) {
     e.preventDefault(); setIsLoading(true); setError(null);
@@ -224,12 +242,13 @@ export function JoinGroupSprintModal({ isOpen, onClose, onJoined, groupSprint })
           intro: intro.trim() || null,
           checkin: checkin.trim() || null,
           groupSprintId: groupSprint.id,
+          startWordCount: startWordCount ? Number(startWordCount) : 0,
         }),
       });
       if (res.ok) { const data = await res.json(); onJoined(data.sprint); handleClose(); }
-      else if (res.status === 401) { setError("Your session expired. Please sign in again."); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "Failed to join sprint."); }
-    } catch { setError("Could not reach the server."); }
+      else if (res.status === 401) { setError("Your session has expired. Please log in or sign up to continue."); }
+      else { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't join the sprint. Please try again."); }
+    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
     finally { setIsLoading(false); }
   }
 
@@ -281,6 +300,21 @@ export function JoinGroupSprintModal({ isOpen, onClose, onJoined, groupSprint })
             <p className="mt-1 text-xs text-gray-400 text-right">{checkin.length}/200</p>
           </div>
 
+          {/* Start word count */}
+          <div>
+            <label className="block text-sm font-medium text-ink-primary mb-1">
+              What's your current word count? <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <p className="text-xs text-gray-400 mb-2">
+              We'll use this to calculate how many words you add this sprint.
+            </p>
+            <input
+              type="number" value={startWordCount} onChange={(e) => setStartWordCount(e.target.value)}
+              placeholder="e.g. 3400" min={0}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream"
+            />
+          </div>
+
           <ErrorBanner message={error} />
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={handleClose}
@@ -306,13 +340,14 @@ export function JoinGroupSprintModal({ isOpen, onClose, onJoined, groupSprint })
 export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, sprintId }) {
   const [step, setStep] = useState(1);
   const [checkout, setCheckout] = useState("");
+  const [endWordCount, setEndWordCount] = useState("");
   const [wordsWritten, setWordsWritten] = useState("");
   const [thankNote, setThankNote] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
   function handleClose() {
-    setStep(1); setCheckout(""); setWordsWritten(""); setThankNote(""); setError(null); onClose();
+    setStep(1); setCheckout(""); setEndWordCount(""); setWordsWritten(""); setThankNote(""); setError(null); onClose();
   }
 
   async function handleCheckout(e) {
@@ -320,11 +355,19 @@ export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, s
     try {
       const res = await fetch(`${API_URL}/sprint/${sprintId}/endSprint`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ checkout: checkout.trim() || null, wordsWritten: Number(wordsWritten) || 0 }),
+        body: JSON.stringify({ checkout: checkout.trim() || null, endWordCount: endWordCount ? Number(endWordCount) : null }),
       });
-      if (res.ok) { setStep(2); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "Failed to submit checkout."); }
-    } catch { setError("Could not reach the server."); }
+      if (!res.ok) { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't submit your check-out. Please try again."); return; }
+
+      if (wordsWritten) {
+        await fetch(`${API_URL}/sprint/${sprintId}/words`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+          body: JSON.stringify({ wordsWritten: Number(wordsWritten) }),
+        });
+      }
+
+      setStep(2);
+    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
     finally { setIsLoading(false); }
   }
 
@@ -336,8 +379,8 @@ export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, s
         body: JSON.stringify({ ThankyouNote: thankNote.trim() || null }),
       });
       if (res.ok) { onEnded(); handleClose(); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "Failed to end group sprint."); }
-    } catch { setError("Could not reach the server."); }
+      else { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't end the group sprint. Please try again."); }
+    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
     finally { setIsLoading(false); }
   }
 
@@ -378,14 +421,41 @@ export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, s
               <p className="mt-1 text-xs text-gray-400 text-right">{checkout.length}/300</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink-primary mb-2">
-                Words written <span className="text-gray-400 font-normal">(optional)</span>
+              <label className="block text-sm font-medium text-ink-primary mb-1">
+                What's your total word count now? <span className="text-gray-400 font-normal">(optional)</span>
               </label>
-              <input type="number" value={wordsWritten} onChange={(e) => setWordsWritten(e.target.value)}
-                placeholder="e.g. 412" min={0}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream"
+              <p className="text-xs text-gray-400 mb-2">
+                Your document's current total. We'll subtract your starting count to calculate what you wrote this sprint.
+              </p>
+              <input type="number" value={endWordCount}
+                onChange={(e) => { setEndWordCount(e.target.value); if (e.target.value) setWordsWritten(""); }}
+                placeholder="e.g. 3742" min={0}
+                disabled={!!wordsWritten}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
               />
             </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400 font-medium">OR</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-ink-primary mb-1">
+                How many words did you write this sprint? <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <p className="text-xs text-gray-400 mb-2">
+                Use this if you didn't track your starting word count.
+              </p>
+              <input type="number" value={wordsWritten}
+                onChange={(e) => { setWordsWritten(e.target.value); if (e.target.value) setEndWordCount(""); }}
+                placeholder="e.g. 412" min={0}
+                disabled={!!endWordCount}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+              />
+            </div>
+
             <ErrorBanner message={error} />
             <div className="flex gap-3 pt-1">
               <button type="button" onClick={handleClose}
@@ -441,22 +511,32 @@ export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, s
 // ─────────────────────────────────────────────────────────────────────────────
 export function MemberCheckoutModal({ isOpen, onClose, onCheckedOut, sprintId }) {
   const [checkout, setCheckout] = useState("");
+  const [endWordCount, setEndWordCount] = useState("");
   const [wordsWritten, setWordsWritten] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  function handleClose() { setCheckout(""); setWordsWritten(""); setError(null); onClose(); }
+  function handleClose() { setCheckout(""); setEndWordCount(""); setWordsWritten(""); setError(null); onClose(); }
 
   async function handleSubmit(e) {
     e.preventDefault(); setIsLoading(true); setError(null);
     try {
       const res = await fetch(`${API_URL}/sprint/${sprintId}/endSprint`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ checkout: checkout.trim() || null, wordsWritten: Number(wordsWritten) || 0 }),
+        body: JSON.stringify({ checkout: checkout.trim() || null, endWordCount: endWordCount ? Number(endWordCount) : null }),
       });
-      if (res.ok) { const data = await res.json(); onCheckedOut(data.sprint); handleClose(); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "Failed to submit checkout."); }
-    } catch { setError("Could not reach the server."); }
+      if (!res.ok) { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't submit your check-out. Please try again."); return; }
+
+      if (wordsWritten) {
+        await fetch(`${API_URL}/sprint/${sprintId}/words`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+          body: JSON.stringify({ wordsWritten: Number(wordsWritten) }),
+        });
+      }
+
+      const data = await res.json().catch(() => ({}));
+      onCheckedOut(data.sprint); handleClose();
+    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
     finally { setIsLoading(false); }
   }
 
@@ -483,14 +563,41 @@ export function MemberCheckoutModal({ isOpen, onClose, onCheckedOut, sprintId })
             <p className="mt-1 text-xs text-gray-400 text-right">{checkout.length}/300</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-ink-primary mb-2">
-              Words written <span className="text-gray-400 font-normal">(optional)</span>
+            <label className="block text-sm font-medium text-ink-primary mb-1">
+              What's your total word count now? <span className="text-gray-400 font-normal">(optional)</span>
             </label>
-            <input type="number" value={wordsWritten} onChange={(e) => setWordsWritten(e.target.value)}
-              placeholder="e.g. 287" min={0}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream"
+            <p className="text-xs text-gray-400 mb-2">
+              Your document's current total. We'll subtract your starting count to calculate what you wrote this sprint.
+            </p>
+            <input type="number" value={endWordCount}
+              onChange={(e) => { setEndWordCount(e.target.value); if (e.target.value) setWordsWritten(""); }}
+              placeholder="e.g. 3742" min={0}
+              disabled={!!wordsWritten}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
             />
           </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400 font-medium">OR</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-ink-primary mb-1">
+              How many words did you write this sprint? <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <p className="text-xs text-gray-400 mb-2">
+              Use this if you didn't track your starting word count.
+            </p>
+            <input type="number" value={wordsWritten}
+              onChange={(e) => { setWordsWritten(e.target.value); if (e.target.value) setEndWordCount(""); }}
+              placeholder="e.g. 287" min={0}
+              disabled={!!endWordCount}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+            />
+          </div>
+
           <ErrorBanner message={error} />
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={handleClose}

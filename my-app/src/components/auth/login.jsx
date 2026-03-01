@@ -50,11 +50,11 @@ export default function Login() {
         navigate("/dashboard");
       } else {
         setServerError(
-          data.message || "Hmm, that doesn't match. Try again?"
+          data.message || "That email or password doesn't look right. Please check and try again."
         );
       }
     } catch (error) {
-      setServerError("Couldn't connect. Check your internet?");
+      setServerError("We couldn't connect to the server. Please check your internet connection and try again.");
     } finally {
       setIsLoading(false);
     }

@@ -19,6 +19,8 @@ import GroupSprintWorkspace from './components/sprint/groupSprintWorkspace';
 import Notification from './components/notification/notification';
 import Profile from './components/profile/profile';
 // import EditProfile from './components/profile/editProfile';
+import NotFound from './components/NotFound';
+import About from './components/about/about';
 import App from './App'
 
 if ("serviceWorker" in navigator) {
@@ -77,6 +79,14 @@ const router = createBrowserRouter([
   {
     path: "/notifications",
     element: <Notification />
+  },
+  {
+    path: "/about",
+    element: <About />
+  },
+  {
+    path: "*",
+    element: <NotFound />
   }
 ])
 

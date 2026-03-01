@@ -32,6 +32,7 @@ export default function StartSprint() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const [checkin, setCheckin] = useState("");
+  const [startWordCount, setStartWordCount] = useState("");
   const [duration, setDuration] = useState(25);
   const [isLoading, setIsLoading] = useState(false);
   const [serverWaking, setServerWaking] = useState(false);
@@ -75,6 +76,7 @@ export default function StartSprint() {
           body: JSON.stringify({
             duration,
             checkin: checkin.trim() || null,
+            startWordCount: startWordCount ? Number(startWordCount) : 0,
           }),
         },
         3,
@@ -85,15 +87,15 @@ export default function StartSprint() {
         const data = await res.json();
         navigate(`/sprint/${data.sprint.id}`);
       } else if (res.status === 401) {
-        setError("Your session expired. Please sign in again.");
+        setError("Your session has expired. Please log in or sign up to continue.");
         setTimeout(() => navigate("/auth/login"), 2000);
       } else {
         const body = await res.json().catch(() => ({}));
-        setError(body.message || "Failed to start sprint. Please try again.");
+        setError(body.message || "We couldn't start your sprint. Please try again.");
       }
     } catch (err) {
       console.error("Start sprint error:", err);
-      setError("Could not reach the server. Please check your connection and try again.");
+      setError("We couldn't reach the server. Please check your connection and try again.");
     } finally {
       clearTimeout(wakingTimer);
       setServerWaking(false);
@@ -201,6 +203,29 @@ export default function StartSprint() {
               />
               <p className="mt-2 text-xs text-gray-500">
                 {checkin.length}/200 characters
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="startWordCount"
+                className="block text-lg font-serif text-ink-primary mb-3"
+              >
+                What's your current word count? <span className="text-sm text-gray-500 font-sans">(optional)</span>
+              </label>
+              <input
+                type="number"
+                id="startWordCount"
+                value={startWordCount}
+                onChange={(e) => setStartWordCount(e.target.value)}
+                placeholder="e.g. 3400"
+                min="0"
+                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray
+                         focus:ring-2 focus:ring-ink-gold focus:border-ink-gold
+                         bg-white text-ink-gray placeholder-gray-400 transition-all"
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                We'll use this to calculate how many words you add this sprint.
               </p>
             </div>
 

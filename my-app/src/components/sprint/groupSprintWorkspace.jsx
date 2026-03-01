@@ -99,28 +99,33 @@ function LikeButton({ sprintId, initialCount = 0, initialLiked = false }) {
 function CheckinBubble({ sprint, isHost }) {
   const user = sprint.user;
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-start gap-4">
       <Link to={`/profile/${user?.username}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
-        <Avatar username={user?.username} avatar={user?.avatar} isHost={isHost} />
+        <Avatar username={user?.username} avatar={user?.avatar} isHost={isHost} size="lg" />
       </Link>
-      <div className="max-w-[72%]">
-        <p className="text-xs text-gray-400 mb-1">
+      <div className="max-w-[85%]">
+        <p className="text-xs text-gray-400 mb-1.5">
           <Link to={`/profile/${user?.username}`} className="hover:text-[#2d3748] transition-colors font-medium">
             @{user?.username}
           </Link>
           {isHost && <span className="ml-1.5 text-[#d4af37]">· host</span>}
         </p>
-        <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+        <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm">
           {sprint.checkin ? (
             <>
-              <p className="text-xs font-semibold text-[#d4af37] uppercase tracking-wide mb-1">writing on</p>
-              <p className="text-sm text-[#2d3748] leading-relaxed">{sprint.checkin}</p>
+              <p className="text-xs font-semibold text-[#d4af37] uppercase tracking-wide mb-1.5">writing on</p>
+              <p className="text-base text-[#2d3748] leading-relaxed">{sprint.checkin}</p>
             </>
           ) : (
-            <p className="text-sm text-gray-400 italic">Joined quietly ✨</p>
+            <p className="text-base text-gray-400 italic">Joined quietly</p>
+          )}
+          {sprint.startWordCount > 0 && (
+            <p className="text-xs text-gray-400 mt-3 pt-2.5 border-t border-gray-100">
+              Starting at <span className="font-medium text-[#2d3748]">{sprint.startWordCount.toLocaleString()}</span> words
+            </p>
           )}
         </div>
-        <div className="mt-1.5 ml-1">
+        <div className="mt-2 ml-1">
           <LikeButton sprintId={sprint.id} initialCount={sprint._count?.likes || 0} initialLiked={sprint.userLiked || false} />
         </div>
       </div>
@@ -132,29 +137,29 @@ function CheckinBubble({ sprint, isHost }) {
 function CheckoutBubble({ sprint, isHost }) {
   const user = sprint.user;
   return (
-    <div className="flex items-start gap-3 flex-row-reverse">
+    <div className="flex items-start gap-4 flex-row-reverse">
       <Link to={`/profile/${user?.username}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
-        <Avatar username={user?.username} avatar={user?.avatar} isHost={isHost} />
+        <Avatar username={user?.username} avatar={user?.avatar} isHost={isHost} size="lg" />
       </Link>
-      <div className="max-w-[72%] flex flex-col items-end">
-        <p className="text-xs text-gray-400 mb-1">
+      <div className="max-w-[85%] flex flex-col items-end">
+        <p className="text-xs text-gray-400 mb-1.5">
           <Link to={`/profile/${user?.username}`} className="hover:text-[#2d3748] transition-colors font-medium">
             @{user?.username}
           </Link>
           {isHost && <span className="ml-1.5 text-[#d4af37]">· host</span>}
         </p>
-        <div className="bg-[#2d3748] rounded-2xl rounded-tr-sm px-4 py-3">
-          <p className="text-xs font-semibold text-[#d4af37] uppercase tracking-wide mb-1">how it went</p>
+        <div className="bg-[#2d3748] rounded-2xl rounded-tr-sm px-5 py-4">
+          <p className="text-xs font-semibold text-[#d4af37] uppercase tracking-wide mb-1.5">how it went</p>
           {sprint.checkout ? (
-            <p className="text-sm text-white leading-relaxed">{sprint.checkout}</p>
+            <p className="text-base text-white leading-relaxed">{sprint.checkout}</p>
           ) : (
-            <p className="text-sm text-white/50 italic">Finished quietly 🌙</p>
+            <p className="text-base text-white/50 italic">Finished quietly</p>
           )}
           {sprint.wordsWritten > 0 && (
-            <p className="text-xs text-[#d4af37] mt-2">✍️ {sprint.wordsWritten.toLocaleString()} words</p>
+            <p className="text-xs text-[#d4af37] mt-2.5">{sprint.wordsWritten.toLocaleString()} words written</p>
           )}
         </div>
-        <div className="mt-1.5 mr-1">
+        <div className="mt-2 mr-1">
           <LikeButton sprintId={sprint.id} initialCount={sprint._count?.likes || 0} initialLiked={sprint.userLiked || false} />
         </div>
       </div>
@@ -426,12 +431,12 @@ export default function GroupSprintWorkspace() {
           setSecondsLeft(0);
         }
       } else if (res.status === 404) {
-        setError("This group sprint doesn't exist.");
+        setError("This group sprint doesn't exist or may have been removed.");
       } else {
-        setError("Failed to load the sprint.");
+        setError("We couldn't load this sprint. Please refresh and try again.");
       }
     } catch {
-      setError("Could not reach the server.");
+      setError("We couldn't reach the server. Please check your connection and try again.");
     } finally {
       setIsLoading(false);
     }
