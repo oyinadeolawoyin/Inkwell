@@ -7,6 +7,8 @@ import { AuthProvider } from './components/auth/authContext'
 
 import Signup from './components/auth/signup';
 import Login from './components/auth/login';
+import ForgotPassword from './components/auth/forgotPassword';
+import ResetPassword from './components/auth/resetPassword';
 import Welcome from './components/auth/welcome';
 
 import SetupPlan from './components/writingPlan/setupPlan';
@@ -40,6 +42,14 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: <Login />
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPassword />
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPassword />
   },
   {
     path: "/welcome",
