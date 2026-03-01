@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background — full bleed for maskable safe zone -->
+  <rect width="512" height="512" fill="#2d3748"/>
+
+  <!-- Pen nib: upper diamond -->
+  <polygon points="256,108 348,218 256,255 164,218" fill="#d4af37"/>
+
+  <!-- Pen nib: lower point -->
+  <polygon points="164,218 256,404 348,218" fill="#b8962a"/>
+
+  <!-- Nib center slit -->
+  <line x1="256" y1="255" x2="256" y2="404"
+        stroke="#2d3748" stroke-width="12"
+        stroke-linecap="round" opacity="0.55"/>
+</svg>

@@ -1,0 +1,25 @@
+{
+  "name": "Inkwell",
+  "short_name": "Inkwell",
+  "description": "Writing sprints and productivity for writers",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#2d3748",
+  "theme_color": "#2d3748",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
