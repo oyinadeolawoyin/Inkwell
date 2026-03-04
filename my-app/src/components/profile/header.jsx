@@ -163,6 +163,14 @@ export default function Header() {
                         </Link>
 
                         <Link
+                          to="/missions"
+                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                          onClick={() => setShowDropdown(false)}
+                        >
+                          Missions
+                        </Link>
+
+                        <Link
                           to="/about"
                           className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
                           onClick={() => setShowDropdown(false)}
@@ -251,6 +259,14 @@ export default function Header() {
                         onClick={() => setShowDropdown(false)}
                       >
                         Dashboard
+                      </Link>
+
+                      <Link
+                        to="/missions"
+                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        Missions
                       </Link>
 
                       <Link

@@ -345,9 +345,10 @@ export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, s
   const [thankNote, setThankNote] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [completedMissions, setCompletedMissions] = useState([]);
 
   function handleClose() {
-    setStep(1); setCheckout(""); setEndWordCount(""); setWordsWritten(""); setThankNote(""); setError(null); onClose();
+    setStep(1); setCheckout(""); setEndWordCount(""); setWordsWritten(""); setThankNote(""); setError(null); setCompletedMissions([]); onClose();
   }
 
   async function handleCheckout(e) {
@@ -359,13 +360,21 @@ export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, s
       });
       if (!res.ok) { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't submit your check-out. Please try again."); return; }
 
+      const endData = await res.json();
+      let missions = endData.completedMissions || [];
+
       if (wordsWritten) {
-        await fetch(`${API_URL}/sprint/${sprintId}/words`, {
+        const wordsRes = await fetch(`${API_URL}/sprint/${sprintId}/words`, {
           method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
           body: JSON.stringify({ wordsWritten: Number(wordsWritten) }),
         });
+        if (wordsRes.ok) {
+          const wordsData = await wordsRes.json();
+          missions = wordsData.completedMissions || missions;
+        }
       }
 
+      setCompletedMissions(missions);
       setStep(2);
     } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
     finally { setIsLoading(false); }
@@ -472,6 +481,22 @@ export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, s
 
         {step === 2 && (
           <form onSubmit={handleEndGroup} className="p-6 space-y-5">
+            {completedMissions.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-ink-gold uppercase tracking-wide font-medium">
+                  {completedMissions.length === 1 ? "Mission complete! 🏆" : "Missions complete! 🏆"}
+                </p>
+                {completedMissions.map((m) => (
+                  <div key={m.id} className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                    <span className="text-lg">✅</span>
+                    <div>
+                      <p className="text-sm font-semibold text-ink-primary">{m.title}</p>
+                      <p className="text-xs text-gray-500">+{m.xp} XP earned</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <p className="text-sm text-ink-lightgray">
               Leave a thank you note for everyone who joined. It'll appear at the bottom of the sprint feed 💛
             </p>
@@ -515,8 +540,9 @@ export function MemberCheckoutModal({ isOpen, onClose, onCheckedOut, sprintId })
   const [wordsWritten, setWordsWritten] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [completedMissions, setCompletedMissions] = useState(null);
 
-  function handleClose() { setCheckout(""); setEndWordCount(""); setWordsWritten(""); setError(null); onClose(); }
+  function handleClose() { setCheckout(""); setEndWordCount(""); setWordsWritten(""); setError(null); setCompletedMissions(null); onClose(); }
 
   async function handleSubmit(e) {
     e.preventDefault(); setIsLoading(true); setError(null);
@@ -527,20 +553,64 @@ export function MemberCheckoutModal({ isOpen, onClose, onCheckedOut, sprintId })
       });
       if (!res.ok) { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't submit your check-out. Please try again."); return; }
 
+      const endData = await res.json();
+      let missions = endData.completedMissions || [];
+
       if (wordsWritten) {
-        await fetch(`${API_URL}/sprint/${sprintId}/words`, {
+        const wordsRes = await fetch(`${API_URL}/sprint/${sprintId}/words`, {
           method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
           body: JSON.stringify({ wordsWritten: Number(wordsWritten) }),
         });
+        if (wordsRes.ok) {
+          const wordsData = await wordsRes.json();
+          missions = wordsData.completedMissions || missions;
+        }
       }
 
-      const data = await res.json().catch(() => ({}));
-      onCheckedOut(data.sprint); handleClose();
+      onCheckedOut(endData.sprint);
+      if (missions.length > 0) {
+        setCompletedMissions(missions);
+      } else {
+        handleClose();
+      }
     } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
     finally { setIsLoading(false); }
   }
 
   if (!isOpen) return null;
+
+  if (completedMissions) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-ink-primary px-6 py-5">
+            <p className="text-xs text-ink-gold uppercase tracking-widest font-medium mb-0.5">Achievement</p>
+            <h2 className="text-xl font-serif text-white">
+              {completedMissions.length === 1 ? "Mission Complete!" : "Missions Complete!"}
+            </h2>
+          </div>
+          <div className="p-6 space-y-3">
+            <p className="text-sm text-ink-lightgray">You unlocked something new. Keep writing! 🌱</p>
+            {completedMissions.map((m) => (
+              <div key={m.id} className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                <span className="text-xl">✅</span>
+                <div>
+                  <p className="text-sm font-semibold text-ink-primary">{m.title}</p>
+                  <p className="text-xs text-gray-500">+{m.xp} XP earned</p>
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={handleClose}
+              className="w-full py-3 bg-ink-primary text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all mt-2"
+            >
+              Continue →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">

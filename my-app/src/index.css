@@ -69,6 +69,126 @@
   }
 }
 
+/* ── Mission gamification animations ─────────────────────────────────────── */
+@keyframes confetti-fall {
+  0%   { transform: translateY(-10px) rotate(0deg) scale(1);   opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg) scale(0.5); opacity: 0; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(212, 175, 55, 0.5),
+      0 0 20px rgba(212, 175, 55, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(212, 175, 55, 0.9),
+      0 0 40px rgba(212, 175, 55, 0.5),
+      0 0 60px rgba(212, 175, 55, 0.2);
+  }
+}
+
+@keyframes float-up-down {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-5px); }
+}
+
+@keyframes shimmer-slide {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.animate-confetti-fall {
+  animation: confetti-fall linear forwards;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float-up-down 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: shimmer-slide 3s linear infinite;
+}
+
+@keyframes glow-emerald {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(16, 185, 129, 0.4),
+      0 0 20px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(16, 185, 129, 0.8),
+      0 0 40px rgba(16, 185, 129, 0.4),
+      0 0 60px rgba(16, 185, 129, 0.15);
+  }
+}
+
+@keyframes glow-amber {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(245, 158, 11, 0.4),
+      0 0 20px rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(245, 158, 11, 0.8),
+      0 0 40px rgba(245, 158, 11, 0.4),
+      0 0 60px rgba(245, 158, 11, 0.15);
+  }
+}
+
+@keyframes glow-rose {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(244, 63, 94, 0.4),
+      0 0 20px rgba(244, 63, 94, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(244, 63, 94, 0.8),
+      0 0 40px rgba(244, 63, 94, 0.4),
+      0 0 60px rgba(244, 63, 94, 0.15);
+  }
+}
+
+.animate-glow-emerald {
+  animation: glow-emerald 2s ease-in-out infinite;
+}
+
+.animate-glow-amber {
+  animation: glow-amber 2s ease-in-out infinite;
+}
+
+.animate-glow-rose {
+  animation: glow-rose 2s ease-in-out infinite;
+}
+
+@keyframes feature-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.animate-feature-progress {
+  animation: feature-progress 4.5s linear forwards;
+}
+
+@keyframes fade-up-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fade-up-in 0.5s ease-out forwards;
+}
+
 @layer utilities {
   /* Ink/Cream Color System */
   .bg-ink-cream {

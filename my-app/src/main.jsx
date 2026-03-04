@@ -23,6 +23,7 @@ import Profile from './components/profile/profile';
 // import EditProfile from './components/profile/editProfile';
 import NotFound from './components/NotFound';
 import About from './components/about/about';
+import Missions from './components/missions/missions';
 import App from './App'
 
 if ("serviceWorker" in navigator) {
@@ -93,6 +94,10 @@ const router = createBrowserRouter([
   {
     path: "/about",
     element: <About />
+  },
+  {
+    path: "/missions",
+    element: <Missions />
   },
   {
     path: "*",

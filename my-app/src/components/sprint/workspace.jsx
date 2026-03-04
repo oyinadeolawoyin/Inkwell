@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import Header from "../profile/header";
 import API_URL from "@/config/api";
+import { Confetti, RANK_CONFIG } from "../missions/MissionCard";
 
 export default function ActiveSprint() {
   const { sprintId } = useParams();
@@ -380,6 +381,7 @@ function SprintCompleteModal({ sprintId, onClose }) {
   const [wordsWritten, setWordsWritten] = useState("");
   const [checkout, setCheckout] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [completedMissions, setCompletedMissions] = useState(null);
 
   async function handleComplete() {
     setIsLoading(true);
@@ -397,21 +399,118 @@ function SprintCompleteModal({ sprintId, onClose }) {
 
       if (!res.ok) return;
 
+      const endData = await res.json();
+      let missions = endData.completedMissions || [];
+
       if (wordsWritten) {
-        await fetch(`${API_URL}/sprint/${sprintId}/words`, {
+        const wordsRes = await fetch(`${API_URL}/sprint/${sprintId}/words`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ wordsWritten: Number(wordsWritten) }),
         });
+        if (wordsRes.ok) {
+          const wordsData = await wordsRes.json();
+          missions = wordsData.completedMissions || missions;
+        }
       }
 
-      onClose();
+      if (missions.length > 0) {
+        setCompletedMissions(missions);
+      } else {
+        onClose();
+      }
     } catch (error) {
       console.error("Failed to complete sprint:", error);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (completedMissions) {
+    const ranksUnlocked = completedMissions.filter((m) => m.rankUnlocked);
+    const totalXp       = completedMissions.reduce((sum, m) => sum + (m.xp || 0), 0);
+
+    return (
+      <>
+        <Confetti active onDone={() => {}} />
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-soft-lg max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-300">
+
+            {/* Hero banner */}
+            <div className="bg-gradient-to-br from-[#1a2233] via-[#2d3748] to-[#1a2233] px-6 py-7 text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer pointer-events-none" />
+              <div className="text-5xl mb-3 animate-bounce relative z-10">🏆</div>
+              <h2 className="text-2xl sm:text-3xl font-serif text-white mb-1 relative z-10">
+                {completedMissions.length === 1 ? "Quest Complete!" : "Quests Complete!"}
+              </h2>
+              <p className="text-amber-300/80 text-sm relative z-10">Your dedication paid off. Keep writing!</p>
+
+              {/* Total XP earned */}
+              <div className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-amber-400/20 border border-amber-400/40 rounded-xl relative z-10">
+                <span className="text-2xl font-bold text-amber-300 font-mono">+{totalXp}</span>
+                <span className="text-amber-300/80 font-semibold text-sm">XP earned</span>
+              </div>
+            </div>
+
+            {/* Mission list */}
+            <div className="px-6 py-5 space-y-3">
+              {completedMissions.map((m) => {
+                const difficulty = m.difficulty || "EASY";
+                const diffColors = {
+                  EASY:   { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", icon: "🌱" },
+                  MEDIUM: { bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-700",   icon: "⚡" },
+                  HARD:   { bg: "bg-rose-50",    border: "border-rose-200",    text: "text-rose-700",    icon: "🔥" },
+                };
+                const dc = diffColors[difficulty] || diffColors.EASY;
+                return (
+                  <div key={m.id} className={`flex items-center gap-3 p-4 ${dc.bg} border ${dc.border} rounded-xl`}>
+                    <span className="text-xl flex-shrink-0">✅</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-ink-primary">{m.title}</p>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${dc.bg} ${dc.text} border ${dc.border}`}>
+                          {dc.icon} {difficulty.charAt(0) + difficulty.slice(1).toLowerCase()}
+                        </span>
+                      </div>
+                      <p className={`text-xs font-bold mt-0.5 ${dc.text}`}>+{m.xp} XP</p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Rank-up celebrations */}
+              {ranksUnlocked.map((m) => {
+                const rankCfg = RANK_CONFIG[m.rankUnlocked] || RANK_CONFIG["Inklings"];
+                return (
+                  <div
+                    key={`rank-${m.id}`}
+                    className="flex items-center gap-3 p-4 bg-gradient-to-r from-amber-400/20 to-yellow-300/20 border-2 border-amber-400/60 rounded-xl"
+                  >
+                    <span className="text-2xl animate-float flex-shrink-0">{rankCfg.icon}</span>
+                    <div>
+                      <p className="text-sm font-bold text-amber-800">Rank Unlocked!</p>
+                      <p className="text-xs text-amber-700">
+                        You've earned the <span className="font-bold">{m.rankUnlocked}</span> rank — claim it on your dashboard!
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="px-6 pb-6">
+              <button
+                onClick={onClose}
+                className="w-full py-3 bg-ink-primary text-white rounded-xl font-bold hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98] text-base"
+              >
+                Continue writing ✍️
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
   }
 
   return (
