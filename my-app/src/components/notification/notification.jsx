@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, Loader2, Inbox, Check } from "lucide-react";
 import { useAuth } from "../auth/authContext";
+import { useProfileModal } from "../profile/profilemodalcontext";
 import API_URL from "@/config/api";
 
 function Notification() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("writing"); // "writing" | "community"
   const { user } = useAuth();
+  const { openProfile } = useProfileModal();
 
   useEffect(() => {
     async function fetchNotifications() {
@@ -59,6 +62,23 @@ function Notification() {
   const unreadCount = notifications.filter((n) => n.isUnread).length;
   const unreadExists = unreadCount > 0;
 
+  // Per-tab unread counts, so Writing/Community can each show their own
+  // badge instead of just the combined total above.
+  const unreadByTab = notifications.reduce((counts, n) => {
+    if (!n.isUnread) return counts;
+    const key = n.category?.toLowerCase();
+    if (key) counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+
+  const TABS = [
+    { key: "writing",   label: "Writing" },
+    { key: "community", label: "Community" },
+  ];
+  const visibleNotifications = notifications.filter(
+    (n) => n.category?.toLowerCase() === activeTab
+  );
+
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-3xl mx-auto">
       {/* Page Title */}
@@ -89,6 +109,31 @@ function Notification() {
         )}
       </div>
 
+      {/* Writing / Community tabs */}
+      <div className="flex items-center gap-1 mb-6 border-b border-ink-lightgray/30">
+        {TABS.map((tab) => {
+          const tabUnread = unreadByTab[tab.key] || 0;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === tab.key
+                  ? "border-sky-400 text-sky-400"
+                  : "border-transparent text-ink-gray hover:text-ink-primary"
+              }`}
+            >
+              {tab.label}
+              {tabUnread > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] px-1 text-[10px] font-semibold rounded-full bg-ink-gold/20 text-ink-primary">
+                  {tabUnread}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-20">
@@ -105,27 +150,25 @@ function Notification() {
       )}
 
       {/* Notifications List */}
-      {!loading && !error && notifications.length > 0 ? (
+      {!loading && !error && visibleNotifications.length > 0 ? (
         <div className="space-y-2">
-          {notifications.map((notification) => (
-            <Link
-              key={notification.id}
-              to={notification.link}
-              className={`block bg-white rounded-xl shadow-soft p-5 transition-all duration-200 hover:shadow-soft-lg group ${
-                notification.isUnread
-                  ? "border-l-4 border-ink-gold"
-                  : "border-l-4 border-transparent"
-              }`}
-            >
+          {visibleNotifications.map((notification) => {
+            const cardClassName = `block w-full text-left bg-white rounded-xl shadow-soft p-5 transition-all duration-200 hover:shadow-soft-lg group ${
+              notification.isUnread
+                ? "border-l-4 border-sky-400"
+                : "border-l-4 border-transparent"
+            }`;
+
+            const content = (
               <div className="flex items-start gap-4">
                 <div
                   className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-                    notification.isUnread ? "bg-ink-gold/20" : "bg-ink-lightgray/30"
+                    notification.isUnread ? "bg-sky-100" : "bg-gray-100"
                   }`}
                 >
                   <Bell
                     className={`w-4 h-4 ${
-                      notification.isUnread ? "text-ink-gold" : "text-ink-gray"
+                      notification.isUnread ? "text-sky-500" : "text-gray-400"
                     }`}
                   />
                 </div>
@@ -134,14 +177,14 @@ function Notification() {
                   <p
                     className={`text-sm leading-relaxed ${
                       notification.isUnread
-                        ? "text-ink-primary font-medium"
-                        : "text-ink-gray"
+                        ? "text-gray-900 font-medium"
+                        : "text-gray-600"
                     }`}
                   >
                     {notification.message}
                   </p>
                   {notification.createdAt && (
-                    <p className="text-xs text-ink-lightgray mt-2">
+                    <p className="text-xs text-gray-400 mt-2">
                       {new Date(notification.createdAt).toLocaleString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -155,12 +198,35 @@ function Notification() {
 
                 {!notification.isUnread && (
                   <div className="flex-shrink-0">
-                    <Check className="w-4 h-4 text-ink-lightgray" />
+                    <Check className="w-4 h-4 text-gray-300" />
                   </div>
                 )}
               </div>
-            </Link>
-          ))}
+            );
+
+            // Notifications with an actor (someone you follow started a
+            // sprint, logged progress, hit halfway, finished a draft…) open
+            // that writer's profile popup so you can send them a card right
+            // there, instead of navigating away to a page.
+            if (notification.actorId != null) {
+              return (
+                <button
+                  key={notification.id}
+                  type="button"
+                  onClick={() => openProfile(notification.actorId)}
+                  className={cardClassName}
+                >
+                  {content}
+                </button>
+              );
+            }
+
+            return (
+              <Link key={notification.id} to={notification.link} className={cardClassName}>
+                {content}
+              </Link>
+            );
+          })}
         </div>
       ) : (
         !loading &&
@@ -173,7 +239,7 @@ function Notification() {
               No notifications yet
             </h2>
             <p className="text-sm text-ink-gray max-w-sm">
-              When you receive notifications, they'll appear here.
+              No {activeTab} notifications yet.
             </p>
           </div>
         )

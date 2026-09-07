@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { TopBar } from "./topBar";
+import { TopBar } from "./topBar"
 import { Sidebar } from "./sidebar";
+import { Footer } from "./footer";
 import { useAuth } from "../auth/authContext";
 
 // Wraps every page (public and authenticated alike). TopBar is the plain
@@ -41,7 +42,7 @@ export default function Layout() {
   }, [pathname]);
 
   return (
-    <div className="h-dvh flex flex-col bg-[#fafaf9] overflow-hidden">
+    <div className="h-dvh flex flex-col bg-background overflow-hidden">
       <TopBar
         mobileNavOpen={mobileNavOpen}
         onToggleMobileNav={() => setMobileNavOpen((o) => !o)}
@@ -56,10 +57,15 @@ export default function Layout() {
           />
         )}
 
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
+        {/* pb-8 reserves room for the fixed Footer below so its content
+            never scrolls underneath it — matches Footer's own height. */}
+        <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto bg-background ${!pageFocusMode ? "pb-8" : ""}`}>
           <Outlet context={{ setLayoutFocusMode: setPageFocusMode }} />
         </div>
       </div>
+
+      
+      {/* {!pageFocusMode && <Footer />} */}
     </div>
   );
 }

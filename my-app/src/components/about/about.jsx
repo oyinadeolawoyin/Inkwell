@@ -1,1032 +1,773 @@
-import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import API_URL from "@/config/api";
-import { useAuth } from "../auth/authContext";
-import { EventPromoBanner } from "../event/eventpromobanner";
-import { MiniChallengeBanner } from "../minichallenge/minichallengebanner";
+// src/components/about/about.jsx
+//
+// Landing/about page. One tagline, one job: get a writer into their
+// workspace — and for a visitor who isn't signed in yet, show them
+// enough of the real product to want to. Every demo here reuses the
+// actual tokens/shapes/copy the live features use (CARD_THEME +
+// CARD_COPY for Mailbox, the same ring/pace-chart math as
+// draftPlanPage.jsx, the same brag-card layout as logProgressModal.jsx)
+// so nothing shown here can drift out of sync with what's real.
+//
+// Auth-aware: useAuth() decides every CTA on the page. Signed in →
+// straight to the workspace/mailbox/draft plan. Signed out → every one
+// of those same buttons routes to /login instead, so a visitor never
+// hits a dead end, they hit an invitation.
+//
+// Layout: each feature section is a two-column row (copy one side, the
+// live demo the other, alternating sides) that stacks to a single
+// column on mobile. Sections fade/slide in the first time they enter
+// the viewport (see <Reveal> below) instead of firing once on mount —
+// that also drives each demo's own reveal animation (rings, progress
+// bars), so nothing animates while it's still off-screen.
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { PenLine, Mail, LogIn, Sparkles, Flower2, Rocket, PartyPopper, Star, Heart, Cake, Check } from "lucide-react";
 import { AppMetaTags } from "../utilis/metatags";
+import { useAuth } from "../auth/authContext";
+import { CARD_THEME, CARD_TYPES } from "../mailbox/mailboxCardTheme";
+import FoundingWritersCarousel from "../foundingWriters/foundingWritersCarousel";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const CARD_ICONS = { Flower2, Rocket, PartyPopper, Star, Heart, Cake };
 
-function stripHtml(html = "") {
-  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-}
+// Same title/tagline pairs as mailboxpage.jsx's CARD_COPY (kept as its
+// own local copy there too, deliberately — see that file's comment).
+const CARD_COPY = {
+  WELCOME: { title: "Welcome!", tagline: "We're so glad you're here." },
+  CONGRATS: { title: "Congratulations!", tagline: "You've done something worth celebrating." },
+  WELL_DONE: { title: "Well Done!", tagline: "Every effort you make matters." },
+  THANK_YOU: { title: "Thank You!", tagline: "Your kindness means more than words." },
+  BOOSTER: { title: "You've Got This!", tagline: "A little energy for the story ahead." },
+  BIRTHDAY: { title: "Happy Birthday!", tagline: "Hope your day is as good as your next chapter." },
+};
 
-function getExcerpt(content = "", length = 120) {
-  const text = stripHtml(content);
-  return text.length > length ? text.slice(0, length) + "…" : text;
-}
+// Same three rings/tones as RingCard in draftPlanPage.jsx.
+const RING_DEMO = [
+  { tone: "social", label: "Story progress", value: 62 },
+  { tone: "achievement", label: "Weekly target", value: 85 },
+  { tone: "highlight", label: "Today's goal", value: 58 },
+];
 
-// A thread's title is optional. When the author didn't set one, fall back to
-// a short, markdown-stripped excerpt of the body instead of showing blank.
-function getThreadTitle(thread, length = 80) {
-  if (thread?.title && thread.title.trim()) return thread.title.trim();
-  const raw = stripHtml(thread?.context || "")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .replace(/_([^_]+)_/g, "$1")
-    .trim();
-  if (!raw) return "Untitled thread";
-  return raw.length > length ? raw.slice(0, length) + "…" : raw;
-}
+const TILT = [-3, 2, -2, 3, -2.5, 2.5];
+const TILE_WORDS = ["ember", "hollow", "reckon"];
 
-function timeAgo(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
-
-// ─── Avatar (navigable to profile) ───────────────────────────────────────────
-
-function Avatar({ user, size = 8, onClick }) {
-  if (!user) return null;
-  const cls = `w-${size} h-${size} rounded-full object-cover flex-shrink-0 border-2 border-white`;
-  const initials = (user.username || "?")[0].toUpperCase();
-
-  const inner = user.avatar ? (
-    <img src={user.avatar} alt={user.username} className={cls} />
-  ) : (
-    <div
-      className={`${cls} flex items-center justify-center text-xs font-bold text-[#1a1a2e]`}
-      style={{ background: "linear-gradient(135deg, #d4af37, #f0d060)" }}
-    >
-      {initials}
-    </div>
-  );
-
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className="flex-shrink-0 hover:opacity-80 transition-opacity">
-        {inner}
-      </button>
-    );
+// ── demo pace data ──────────────────────────────────────────────────────
+//
+// A visitor has no real progressLogs, so this is a deterministic (not
+// random — identical on every render/reload) stand-in with a gentle
+// upward trend, shaped the same way buildDailySeries returns:
+// { key, label, count }.
+function generateDemoSeries(days) {
+  const today = new Date();
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const idx = days - 1 - i;
+    const wave = Math.sin(idx / 2.1) * 140;
+    const trend = (idx / days) * 420;
+    const count = Math.max(180, Math.round(320 + trend + wave));
+    out.push({
+      key: d.toISOString().slice(0, 10),
+      label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      count,
+    });
   }
-
-  return (
-    <Link to={`/profile/${user.id}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
-      {inner}
-    </Link>
-  );
+  return out;
 }
 
-// ─── Sign-up nudge modal ──────────────────────────────────────────────────────
+const PACE_DEMO = { "7": generateDemoSeries(7), "15": generateDemoSeries(15), "30": generateDemoSeries(30) };
 
-function SignupNudge({ message, onClose, onSignup }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(26,26,46,0.55)" }}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center">
-        <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}>
-          <span className="text-[#1a1a2e] text-xl">✦</span>
-        </div>
-        <h3 className="font-serif text-xl text-[#1a1a2e] mb-2">Join to continue</h3>
-        <p className="text-[14px] text-[#6b5c4a] mb-6 leading-relaxed">{message}</p>
-        <button
-          onClick={onSignup}
-          className="w-full py-3 rounded-xl font-semibold text-[#1a1a2e] mb-3 transition-all hover:opacity-90"
-          style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
-        >
-          Create a free account
-        </button>
-        <button onClick={onClose} className="text-[13px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors">
-          Maybe later
-        </button>
-      </div>
-    </div>
-  );
+function niceCeiling(value) {
+  if (value <= 0) return 1;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+  const residual = value / magnitude;
+  let niceResidual;
+  if (residual <= 1) niceResidual = 1;
+  else if (residual <= 2) niceResidual = 2;
+  else if (residual <= 5) niceResidual = 5;
+  else niceResidual = 10;
+  return niceResidual * magnitude;
 }
 
-// ─── Challenge picker modal ────────────────────────────────────────────────────
-
-function ChallengePicker({ onClose, onPick }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(26,26,46,0.55)" }}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8">
-        <h3 className="font-serif text-xl text-[#1a1a2e] mb-1 text-center">Pick your challenge</h3>
-        <p className="text-[13px] text-[#9a8c7a] text-center mb-6">How many days can you commit to writing?</p>
-        <div className="space-y-3">
-          <button
-            onClick={() => onPick("SEVEN")}
-            className="w-full rounded-xl border-2 border-[#d4af37] p-4 text-left hover:bg-[#fdf8ec] transition-colors group"
-          >
-            <div className="font-serif text-lg text-[#1a1a2e] group-hover:text-[#b8860b]">7-Day Challenge</div>
-            <div className="text-[12px] text-[#9a8c7a] mt-0.5">A week of daily writing sessions. Perfect for building momentum.</div>
-          </button>
-          <button
-            onClick={() => onPick("FIFTEEN")}
-            className="w-full rounded-xl border-2 border-[#1a1a2e] p-4 text-left hover:bg-[#f5f3ef] transition-colors group"
-          >
-            <div className="font-serif text-lg text-[#1a1a2e]">15-Day Challenge</div>
-            <div className="text-[12px] text-[#9a8c7a] mt-0.5">Two weeks of sustained writing. For drafts that need real traction.</div>
-          </button>
-        </div>
-        <button onClick={onClose} className="w-full mt-4 text-[13px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors">
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Section label ────────────────────────────────────────────────────────────
-
-function SectionLabel({ children }) {
-  return (
-    <div className="flex items-center gap-3 mb-5">
-      <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: "#d4af37" }} />
-      <h2 className="font-serif text-lg text-[#1a1a2e] font-semibold">{children}</h2>
-    </div>
-  );
-}
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-
-function Skeleton({ className }) {
-  return <div className={`animate-pulse bg-[#e8e0d0] rounded-lg ${className}`} />;
-}
-
-// ─── Community update card ─────────────────────────────────────────────────────
-
-function CommunityCard({ post, onNudge }) {
-  const navigate = useNavigate();
-  const excerpt = getExcerpt(post.content, 130);
-
-  function handleClick(e) {
-    e.preventDefault();
-    onNudge(
-      "Sign up to read the full community update and stay in the loop.",
-      () => navigate("/signup"),
-      `/blog/${post.id}`
-    );
+// Monotone cubic Hermite tangents — same technique draftPlanPage.jsx's
+// pace chart uses so a peak's visual tip always sits exactly at a real
+// data point, never overshooting between two days.
+function monotoneTangents(xs, ys) {
+  const n = xs.length;
+  const m = new Array(n).fill(0);
+  if (n < 2) return m;
+  const d = [];
+  for (let i = 0; i < n - 1; i++) {
+    const h = xs[i + 1] - xs[i];
+    d.push(h !== 0 ? (ys[i + 1] - ys[i]) / h : 0);
   }
-
-  return (
-    <div
-      onClick={handleClick}
-      className="group bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden cursor-pointer
-                 hover:border-[#d4af37]/60 hover:shadow-[0_4px_24px_rgba(212,175,55,0.12)] transition-all duration-300 flex flex-col"
-    >
-      {post.mediaUrl && (
-        <div className="h-44 overflow-hidden flex-shrink-0">
-          <img
-            src={post.mediaUrl}
-            alt={post.title || ""}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        </div>
-      )}
-      {!post.mediaUrl && (
-        <div className="h-44 flex-shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1a1a2e,#1e2d4a)" }}>
-          <span className="font-serif text-white text-5xl opacity-10">✦</span>
-        </div>
-      )}
-
-      <div className="p-5 flex flex-col flex-1">
-        <span className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#d4af37" }}>
-          {new Date(post.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-        </span>
-
-        {post.title && (
-          <h3 className="font-serif text-base text-[#1a1a2e] leading-snug mb-2 line-clamp-2 group-hover:text-[#b8860b] transition-colors">
-            {post.title}
-          </h3>
-        )}
-
-        <p className="text-[13px] text-[#6b5c4a] leading-relaxed flex-1 line-clamp-3">{excerpt}</p>
-
-        <div className="flex items-center gap-3 mt-4 pt-3 border-t border-[#f0ebe3]">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div
-              className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-[#1a1a2e]"
-              style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
-            >
-              A
-            </div>
-            <span className="text-[12px] text-[#6b5c4a] truncate font-medium">Quillweave Team</span>
-          </div>
-
-
-          <div className="flex items-center gap-2 text-[11px] text-[#9a8c7a]">
-            <span>{post._count?.likes ?? 0} ♥</span>
-            <span>{post._count?.comments ?? 0} 💬</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Thread card ──────────────────────────────────────────────────────────────
-
-function ThreadCard({ thread, onNudge }) {
-  const navigate = useNavigate();
-
-  function handleClick(e) {
-    e.preventDefault();
-    onNudge(
-      "Join the community to read and participate in discussions.",
-      () => navigate("/signup"),
-      `/threads/${thread.id}`
-    );
+  m[0] = d[0];
+  m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    m[i] = (d[i - 1] === 0 || d[i] === 0 || (d[i - 1] > 0) !== (d[i] > 0)) ? 0 : (d[i - 1] + d[i]) / 2;
   }
-
-  return (
-    <div
-      onClick={handleClick}
-      className="group flex gap-3 items-start py-3 border-b border-[#f0ebe3] last:border-b-0 cursor-pointer hover:bg-[#faf8f4] -mx-4 px-4 transition-colors"
-    >
-      <Avatar user={thread.author} size={8} onClick={(e) => { e?.stopPropagation?.(); }} />
-      <div className="flex-1 min-w-0">
-        <h4 className="text-[13px] font-semibold text-[#1a1a2e] line-clamp-2 group-hover:text-[#b8860b] transition-colors leading-snug">
-          {getThreadTitle(thread)}
-        </h4>
-        <div className="flex items-center gap-2 mt-1 text-[11px] text-[#9a8c7a]">
-          <span className="font-medium text-[#6b5c4a]">{thread.author?.username}</span>
-          <span>·</span>
-          <span>{thread._count?.likes ?? 0} ♥</span>
-          <span>·</span>
-          <span>{thread.totalCommentCount ?? thread._count?.comments ?? 0} 💬</span>
-          <span>·</span>
-          <span>{timeAgo(thread.createdAt)}</span>
-        </div>
-      </div>
-    </div>
-  );
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const alpha = m[i] / d[i];
+    const beta = m[i + 1] / d[i];
+    const s = alpha * alpha + beta * beta;
+    if (s > 9) {
+      const tau = 3 / Math.sqrt(s);
+      m[i] = tau * alpha * d[i];
+      m[i + 1] = tau * beta * d[i];
+    }
+  }
+  return m;
 }
 
-// ─── Sidebar widget shell ──────────────────────────────────────────────────────
-// Every right-column widget shares this shell so all three always render the
-// same fixed shape: title row, up to `cap` rows of content, a "See all" link
-// when there's more than `cap`, and a single friendly line when there's none
-// at all. Nothing here ever collapses the widget away — only what's inside
-// the fixed frame changes between a quiet day and a busy one.
-
-function SidebarWidget({ title, action, children }) {
-  return (
-    <div className="bg-white border border-[#e8e0d0] rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-[#9a8c7a]">{title}</p>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
+function smoothPath(points) {
+  if (points.length < 2) return points.length === 1 ? `M ${points[0].x} ${points[0].y}` : "";
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const m = monotoneTangents(xs, ys);
+  let d = `M ${xs[0]} ${ys[0]}`;
+  for (let i = 0; i < xs.length - 1; i++) {
+    const dx = xs[i + 1] - xs[i];
+    const cp1x = xs[i] + dx / 3;
+    const cp1y = ys[i] + (m[i] * dx) / 3;
+    const cp2x = xs[i + 1] - dx / 3;
+    const cp2y = ys[i + 1] - (m[i + 1] * dx) / 3;
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${xs[i + 1]} ${ys[i + 1]}`;
+  }
+  return d;
 }
 
-function SidebarEmptyRow({ children }) {
-  return (
-    <p className="text-[12px] text-[#9a8c7a] leading-relaxed py-2">{children}</p>
-  );
-}
-
-function SidebarSkeletonRows({ count = 3 }) {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex gap-2 items-center">
-          <Skeleton className="w-8 h-8 rounded-full" />
-          <div className="flex-1 space-y-1">
-            <Skeleton className="h-3 w-3/4" />
-            <Skeleton className="h-2 w-1/3" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const SIDEBAR_ROW_CAP = 5;
-
-// ─── Main Homepage ────────────────────────────────────────────────────────────
-
-export default function Homepage() {
+export default function About() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const signedIn = Boolean(user);
 
-  // ── Data state ──
-  const [communityPosts, setCommunityPosts]     = useState([]);
-  const [latestThreads, setLatestThreads]       = useState([]);
-  const [activeThreads, setActiveThreads]       = useState([]);
-  const [topCritiquers, setTopCritiquers]       = useState([]);
-  const [newcomers, setNewcomers]               = useState([]);
-  const [progressLoggers, setProgressLoggers]   = useState([]);
-  const [threadCommenters, setThreadCommenters] = useState([]);
-  const [recentSprinters, setRecentSprinters]   = useState([]);
-  const [loading, setLoading]                   = useState(true);
+  const [period, setPeriod] = useState("7");
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const [activeType, setActiveType] = useState("WELCOME");
 
-  // ── UI state ──
-  const [nudge, setNudge]               = useState(null); // { message, onConfirm }
-  const [showChallengePicker, setShowChallengePicker] = useState(false);
+  const goWorkspace = () => navigate(signedIn ? "/workspace" : "/login");
+  const goMailbox = () => navigate(signedIn ? "/mailbox" : "/login");
+  const goLogSession = () => navigate(signedIn ? "/draftplan" : "/login");
+  const goSignup = () => navigate("/signup");
 
-  // ── Fetch all data ──
-  useEffect(() => {
-    const go = async () => {
-      try {
-        const [
-          postsRes,
-          latestRes,
-          activeRes,
-          critiquersRes,
-          newcomersRes,
-          recentActivityRes,
-        ] = await Promise.all([
-          fetch(`${API_URL}/blog/pinned`).then(r => r.ok ? r.json() : { posts: [] }),
-          // /threads/latest returns { threads, total, page, totalPages }
-          fetch(`${API_URL}/threads/latest`).then(r => r.ok ? r.json() : { threads: [] }),
-          // /threads/active returns an array directly
-          fetch(`${API_URL}/threads/active`).then(r => r.ok ? r.json() : []),
-          // top critiquers (all-time, by feedback count) — sidebar caps display at 5
-          fetch(`${API_URL}/leaderboard/critiquers`).then(r => r.ok ? r.json() : { critiquers: [] }),
-          // newest members (last 2 days only)
-          fetch(`${API_URL}/leaderboard/members`).then(r => r.ok ? r.json() : { newest: [] }),
-          // recent activity — used here just for today's progress loggers
-          fetch(`${API_URL}/leaderboard/homepage-activity`).then(r => r.ok ? r.json() : {}),
-        ]);
-
-        setCommunityPosts(postsRes.posts || []);
-
-        // latestRes is { threads: [...], total, page, totalPages }
-        const latestArr = Array.isArray(latestRes.threads) ? latestRes.threads : [];
-        setLatestThreads(latestArr.slice(0, 5));
-
-        // activeRes is a plain array
-        const activeArr = Array.isArray(activeRes) ? activeRes : (activeRes.threads ?? []);
-        setActiveThreads(activeArr.slice(0, 5));
-
-        // critiquers: [{ rank, critiqueCount, user: { id, username, avatar, feedbackPoints } }]
-        setTopCritiquers(Array.isArray(critiquersRes.critiquers) ? critiquersRes.critiquers : []);
-
-        // newest members from the members page data: [{ rank, user, joinedAt }]
-        setNewcomers(Array.isArray(newcomersRes.newest) ? newcomersRes.newest : []);
-
-        // today's progress loggers, pulled out of the recent-activity payload
-        const recentActivity = recentActivityRes && typeof recentActivityRes === "object" ? recentActivityRes : {};
-        setProgressLoggers(Array.isArray(recentActivity.progressLoggers) ? recentActivity.progressLoggers : []);
-        setThreadCommenters(Array.isArray(recentActivity.threadCommenters) ? recentActivity.threadCommenters : []);
-        setRecentSprinters(Array.isArray(recentActivity.sprinters) ? recentActivity.sprinters : []);
-      } catch {
-        // fail silently — sections just show their empty state
-      } finally {
-        setLoading(false);
-      }
-    };
-    go();
-  }, []);
-
-  // For guests, show the "sign up to continue" modal pointing at signup.
-  // For logged-in users, skip the modal entirely and go straight to where
-  // they were trying to go — they're already a member, no nudge needed.
-  function showNudge(message, onConfirm, loggedInDestination) {
-    if (user) {
-      if (loggedInDestination) navigate(loggedInDestination);
-      return;
-    }
-    setNudge({ message, onConfirm });
-  }
-
-  // Both guests and logged-in users go straight into the wizard now — no
-  // signup nudge here. Guests get to answer every question first; the
-  // wizard itself prompts for an account right before the final submit,
-  // then creates the challenge automatically once they're signed up.
-  function handleChallengePickerDone(duration) {
-    setShowChallengePicker(false);
-    navigate(`/days-challenge/new?duration=${duration}`);
-  }
-
-  // ─── Sidebar content ────────────────────────────────────────────────────────
-  // Built once here so the same widgets can sit in the right column on
-  // desktop and re-flow into the document on mobile without duplicating markup.
-
-  const sidebar = (
-    <div className="space-y-6">
-      {/* Newest members — last 2 days — hidden when empty */}
-      {(loading || newcomers.length > 0) && (
-        <SidebarWidget
-          title="New Writers to Welcome"
-          action={
-            newcomers.length > SIDEBAR_ROW_CAP && (
-              <button onClick={() => showNudge("Sign up to see all our newest members.", () => navigate("/signup"), "/members")} className="text-[11px] font-semibold hover:underline" style={{ color: "#d4af37" }}>
-                See all →
-              </button>
-            )
-          }
-        >
-          {loading ? (
-            <SidebarSkeletonRows count={3} />
-          ) : (
-            <div className="space-y-3">
-              {newcomers.slice(0, SIDEBAR_ROW_CAP).map((entry) => {
-                const u = entry.user;
-                return (
-                  <div key={u?.id ?? entry.rank} className="flex items-center gap-3">
-                    <Avatar user={u} size={7} />
-                    <div className="flex-1 min-w-0">
-                      <Link
-                        to={`/profile/${u?.id}`}
-                        className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
-                      >
-                        {u?.username}
-                      </Link>
-                      <p className="text-[10px] text-[#9a8c7a]">Joined {timeAgo(entry.joinedAt)}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </SidebarWidget>
-      )}
-
-      {/* Writers who logged progress today — hidden when empty */}
-      {(loading || progressLoggers.length > 0) && (
-        <SidebarWidget title="Writers Logged Progress Today">
-          {loading ? (
-            <SidebarSkeletonRows count={3} />
-          ) : (
-            <div className="space-y-3">
-              {progressLoggers.slice(0, SIDEBAR_ROW_CAP).map((entry) => (
-                <div key={entry.user.id} className="flex items-center gap-3">
-                  <Avatar user={entry.user} size={7} />
-                  <div className="flex-1 min-w-0">
-                    <Link to={`/profile/${entry.user.id}`} className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block">
-                      {entry.user.username}
-                    </Link>
-                    <p className="text-[10px] text-[#9a8c7a]">
-                      {(entry.countLogged ?? 0).toLocaleString()}{" "}
-                      {{ CHAPTERS: "chapters", SCENES: "scenes", WORDS: "words" }[entry.goalType] ?? "words"}
-                    </p>
-                  </div>
-                  <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: "#1a7a4c" }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#1a7a4c" }} />
-                    Logged Today
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </SidebarWidget>
-      )}
-
-      {/* Members active in threads today — hidden when empty */}
-      {(loading || threadCommenters.length > 0) && (
-        <SidebarWidget title="Active in Threads Today">
-          {loading ? (
-            <SidebarSkeletonRows count={3} />
-          ) : (
-            <div className="space-y-3">
-              {threadCommenters.slice(0, SIDEBAR_ROW_CAP).map((entry) => {
-                const tc = entry.threadCount  ?? 0;
-                const cc = entry.commentCount ?? 0;
-                // Build a label like "2 posts · 3 comments", "1 post", or "4 comments"
-                const parts = [];
-                if (tc > 0) parts.push(`${tc} post${tc !== 1 ? "s" : ""}`);
-                if (cc > 0) parts.push(`${cc} comment${cc !== 1 ? "s" : ""}`);
-                // Fallback: older entries that only carry postCount
-                const activityLabel = parts.length > 0
-                  ? parts.join(" · ")
-                  : `${entry.postCount} comment${entry.postCount !== 1 ? "s" : ""}`;
-
-                return (
-                  <div key={entry.user.id} className="flex items-center gap-3">
-                    <Avatar user={entry.user} size={7} />
-                    <div className="flex-1 min-w-0">
-                      <Link
-                        to={`/profile/${entry.user.id}`}
-                        className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
-                      >
-                        {entry.user.username}
-                      </Link>
-                      <p className="text-[10px] text-[#9a8c7a]">{activityLabel} today</p>
-                    </div>
-                    <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: "#2563a8" }}>
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#2563a8" }} />
-                      In threads
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </SidebarWidget>
-      )}
-
-      {/* Members who sprinted recently (today + yesterday) — hidden when empty */}
-      {(loading || recentSprinters.length > 0) && (
-        <SidebarWidget title="Sprinting Recently">
-          {loading ? (
-            <SidebarSkeletonRows count={3} />
-          ) : (
-            <div className="space-y-3">
-              {recentSprinters.slice(0, SIDEBAR_ROW_CAP).map((entry) => (
-                <div key={entry.user.id} className="flex items-center gap-3">
-                  <Avatar user={entry.user} size={7} />
-                  <div className="flex-1 min-w-0">
-                    <Link
-                      to={`/profile/${entry.user.id}`}
-                      className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
-                    >
-                      {entry.user.username}
-                    </Link>
-                    <p className="text-[10px] text-[#9a8c7a]">
-                      {entry.sprintCount} sprint{entry.sprintCount !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                  <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: "#7c3aed" }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#7c3aed" }} />
-                    Sprinting
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </SidebarWidget>
-      )}
-
-      {/* Top critiquers — all-time, ranked by feedback count */}
-      <SidebarWidget
-        title="Top Critiquers"
-        action={
-          topCritiquers.length > SIDEBAR_ROW_CAP && (
-            <button onClick={() => showNudge("Sign up to see the full critiquer leaderboard.", () => navigate("/signup"), "/critique")} className="text-[11px] font-semibold hover:underline" style={{ color: "#d4af37" }}>
-              See all →
-            </button>
-          )
-        }
-      >
-        {loading ? (
-          <SidebarSkeletonRows count={3} />
-        ) : topCritiquers.length > 0 ? (
-          <div className="space-y-3">
-            {topCritiquers.slice(0, SIDEBAR_ROW_CAP).map((entry) => {
-              const u = entry.user;
-              const rep = u?.feedbackPoints?.reputation ?? null;
-              return (
-                <div key={u?.id ?? entry.rank} className="flex items-center gap-3">
-                  <span className="text-[11px] font-bold text-[#9a8c7a] w-4 flex-shrink-0">#{entry.rank}</span>
-                  <Avatar user={u} size={7} />
-                  <div className="flex-1 min-w-0">
-                    <Link
-                      to={`/profile/${u?.id}`}
-                      className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
-                    >
-                      {u?.username}
-                    </Link>
-                    <p className="text-[10px] text-[#9a8c7a]">
-                      {entry.critiqueCount} critique{entry.critiqueCount !== 1 ? "s" : ""}
-                      {rep !== null ? ` · ★ ${rep}` : ""}
-                    </p>
-                  </div>
-                  {entry.rank === 1 && (
-                    <span className="text-[10px] font-semibold flex items-center gap-0.5 flex-shrink-0" style={{ color: "#d4af37" }}>
-                      ★ Feedback Star
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <SidebarEmptyRow>
-            {user ? (
-              "No critiques yet — be the first to give feedback."
-            ) : (
-              <>
-                Join to see who's giving the best feedback.{" "}
-                <button onClick={() => navigate("/signup")} className="font-semibold hover:underline" style={{ color: "#d4af37" }}>
-                  Sign up →
-                </button>
-              </>
-            )}
-          </SidebarEmptyRow>
-        )}
-      </SidebarWidget>
-    </div>
+  // ── pace chart geometry (same layout constants as WritingPace) ──────
+  const width = 640, height = 200;
+  const padding = { top: 16, right: 12, bottom: 26, left: 44 };
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
+  const series = PACE_DEMO[period];
+  const rawMax = Math.max(...series.map((d) => d.count), 1);
+  const axisMax = niceCeiling(rawMax);
+  const yTicks = [0, 0.5, 1].map((f) => Math.round(axisMax * f));
+  const points = useMemo(
+    () => series.map((d, i) => ({
+      ...d,
+      x: padding.left + (i / (series.length - 1)) * innerW,
+      y: padding.top + innerH - (d.count / axisMax) * innerH,
+    })),
+    [series, axisMax, innerW, innerH]
   );
+  const linePath = smoothPath(points);
+  const areaPath = points.length
+    ? `${linePath} L ${points[points.length - 1].x} ${padding.top + innerH} L ${points[0].x} ${padding.top + innerH} Z`
+    : "";
+  const labelEvery = points.length <= 8 ? 1 : Math.ceil(points.length / 6);
+  const hovered = hoverIdx !== null ? points[hoverIdx] : null;
 
-  // ─── Sections ──────────────────────────────────────────────────────────────
+  function handlePaceMove(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relX = ((e.clientX - rect.left) / rect.width) * width;
+    let closest = 0, closestDist = Infinity;
+    points.forEach((p, i) => {
+      const dist = Math.abs(p.x - relX);
+      if (dist < closestDist) { closestDist = dist; closest = i; }
+    });
+    setHoverIdx(closest);
+  }
+
+  const activeTheme = CARD_THEME[activeType];
+  const activeCopy = CARD_COPY[activeType];
+  const ActiveIcon = CARD_ICONS[activeTheme.icon];
 
   return (
-    <div className="min-h-screen" style={{ background: "#faf8f4" }}>
-      <AppMetaTags />
+    <div className="bg-background overflow-x-hidden">
+      <AppMetaTags
+        title="QuillWeave"
+        description="First, make it exist. A home for writers with more ideas than finished drafts."
+      />
 
-      {/* ── NUDGE MODAL ─────────────────────────────────────────────────────── */}
-      {nudge && (
-        <SignupNudge
-          message={nudge.message}
-          onClose={() => setNudge(null)}
-          onSignup={() => { setNudge(null); nudge.onConfirm?.(); }}
-        />
-      )}
+      <style>{`
+        @keyframes qw-rise {
+          from { opacity: 0; transform: translateY(16px) rotate(var(--tilt, 0deg)); }
+          to   { opacity: 1; transform: translateY(0) rotate(var(--tilt, 0deg)); }
+        }
+        .qw-card {
+          transform: rotate(var(--tilt, 0deg));
+          transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+          cursor: pointer;
+        }
+        .qw-card.qw-in {
+          animation: qw-rise 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--delay, 0ms);
+        }
+        .qw-card:hover, .qw-card.qw-active {
+          transform: translateY(-5px) rotate(0deg);
+          box-shadow: 0 14px 28px -12px rgba(0,0,0,0.55);
+        }
+        @keyframes qw-pop {
+          0% { opacity: 0; transform: scale(0.94) translateY(6px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .qw-pop { animation: qw-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 
-      {/* ── CHALLENGE PICKER ─────────────────────────────────────────────── */}
-      {showChallengePicker && (
-        <ChallengePicker
-          onClose={() => setShowChallengePicker(false)}
-          onPick={handleChallengePickerDone}
-        />
-      )}
+        .qw-section {
+          opacity: 0;
+          transform: translateY(28px);
+          transition: opacity 650ms cubic-bezier(0.22, 1, 0.36, 1), transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .qw-section.qw-section-in { opacity: 1; transform: translateY(0); }
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          HERO — guests see the pitch; logged-in users see a personal welcome
-      ═══════════════════════════════════════════════════════════════════════ */}
-      {user ? (
-        <header className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#1a1a2e 0%,#1e2d4a 60%,#0f1a2e 100%)" }}>
-          <div className="absolute inset-0 opacity-5 pointer-events-none"
-            style={{
-              backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(212,175,55,0.4) 40px, rgba(212,175,55,0.4) 41px)",
-            }}
-          />
+        @keyframes qw-shimmer {
+          0%   { background-position: 0% 50%; }
+          100% { background-position: 200% 50%; }
+        }
+        .qw-headline {
+          background: linear-gradient(
+            90deg,
+            hsl(var(--ink-900)) 0%,
+            hsl(var(--ink-900)) 35%,
+            hsl(var(--social-500)) 50%,
+            hsl(var(--ink-900)) 65%,
+            hsl(var(--ink-900)) 100%
+          );
+          background-size: 220% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: qw-shimmer 5s ease-in-out infinite;
+        }
 
-          <div className="relative max-w-6xl mx-auto px-5 py-16 sm:py-20 text-center">
-            <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border text-[11px] font-bold uppercase tracking-widest"
-              style={{ borderColor: "rgba(212,175,55,0.4)", color: "#d4af37", background: "rgba(212,175,55,0.08)" }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-pulse" />
-              WRITERS HELPING WRITERS FINISH DRAFTS
-            </div>
+        @media (prefers-reduced-motion: reduce) {
+          .qw-card.qw-in, .qw-pop { animation: none; }
+          .qw-card { transition: none; }
+          .qw-section { opacity: 1; transform: none; transition: none; }
+          .qw-headline { animation: none; background-position: 50% 50%; }
+        }
+      `}</style>
 
-            <h1 className="font-serif text-3xl sm:text-5xl font-bold text-white leading-tight mb-4">
-              Welcome back,<br />
-              <span style={{ color: "#d4af37" }}>{user.username}.</span>
-            </h1>
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 pt-8 pb-20">
 
-            <p className="text-[15px] sm:text-base text-[#c5bfb5] max-w-xl mx-auto mb-10 leading-relaxed">
-              Pick up where you left off — log today's progress, jump into a sprint, or see what the community's been writing.
-            </p>
+        {/* ── hero ─────────────────────────────────────────────────────── */}
+        <Reveal className="max-w-2xl mx-auto text-center mb-24 md:mb-32">
+          <h1 className="qw-headline font-display text-4xl sm:text-5xl md:text-6xl font-semibold leading-tight mb-4">
+            First, Make It Exist.
+          </h1>
 
-            {/* Quick actions — straight to the real page, no signup nudge */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-2">
-              <button
-                onClick={() => navigate("/draftplan")}
-                className="px-8 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
-                style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
-              >
-                Log my progress →
-              </button>
+          <p className="text-ink-500 text-sm sm:text-base leading-relaxed mb-8 max-w-md mx-auto">
+            Log the words as they come and let other writers cheer you on. Nothing here waits for perfect.
+          </p>
 
-              <button
-                onClick={() => navigate("/sprint-room")}
-                className="px-8 py-3.5 rounded-xl font-semibold text-white text-[15px] border transition-all hover:bg-white/10"
-                style={{ borderColor: "rgba(212,175,55,0.5)" }}
-              >
-                Start a sprint
-              </button>
-
-              <button
-                onClick={() => navigate("/critique")}
-                className="px-8 py-3.5 rounded-xl font-semibold text-white text-[15px] border transition-all hover:bg-white/10"
-                style={{ borderColor: "rgba(212,175,55,0.5)" }}
-              >
-                Give feedback
-              </button>
-            </div>
-          </div>
-        </header>
-      ) : (
-        <header className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#1a1a2e 0%,#1e2d4a 60%,#0f1a2e 100%)" }}>
-          {/* Subtle texture lines */}
-          <div className="absolute inset-0 opacity-5 pointer-events-none"
-            style={{
-              backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(212,175,55,0.4) 40px, rgba(212,175,55,0.4) 41px)",
-            }}
-          />
-
-          <div className="relative max-w-6xl mx-auto px-5 py-20 sm:py-28 text-center">
-            {/* Eyebrow */}
-            <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border text-[11px] font-bold uppercase tracking-widest"
-              style={{ borderColor: "rgba(212,175,55,0.4)", color: "#d4af37", background: "rgba(212,175,55,0.08)" }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-pulse" />
-              WRITERS HELPING WRITERS FINISH DRAFTS
-            </div>
-
-            <h1 className="font-serif text-4xl sm:text-6xl font-bold text-white leading-tight mb-5">
-              A home for writers with<br />
-              <span style={{ color: "#d4af37" }}>more ideas than finished drafts.</span>
-            </h1>
-
-            <p className="text-[16px] sm:text-lg text-[#c5bfb5] max-w-2xl mx-auto mb-10 leading-relaxed">
-            Join other writers who are working through messy middles, abandoned chapters, and unfinished stories. Share your progress, get feedback, improve your craft, and finally bring more of your ideas to the finish line.
-            </p>
-
-            {/* Primary CTAs */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
-              <button
-                onClick={() => navigate("/draftplan/new")}
-                className="px-8 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
-                style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
-              >
-                Want to finish that draft? →
-              </button>
-
-              <button
-                onClick={() => setShowChallengePicker(true)}
-                className="px-8 py-3.5 rounded-xl font-semibold text-white text-[15px] border transition-all hover:bg-white/10"
-                style={{ borderColor: "rgba(212,175,55,0.5)" }}
-              >
-                Developing, editing or brainstorming? Take the challenge
-              </button>
-            </div>
-
-            {/* Secondary CTA */}
-            <p className="text-[13px] text-[#9a8c7a]">
-              Want feedback on your work?{" "}
-              <button
-                onClick={() => navigate("/signup?intent=critique")}
-                className="font-semibold hover:underline transition-colors"
-                style={{ color: "#d4af37" }}
-              >
-                Get started here for free →
-              </button>
-            </p>
-          </div>
-        </header>
-      )}
-       <EventPromoBanner />
-       <MiniChallengeBanner onNudge={showNudge} />
-      {/* ══════════════════════════════════════════════════════════════════════
-          BODY — fixed two-column layout below ~1024px breakpoint reflows to
-          a single column with the sidebar widgets after the main feed.
-      ═══════════════════════════════════════════════════════════════════════ */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 items-start">
-
-          {/* ── MAIN COLUMN ───────────────────────────────────────────────── */}
-          <div className="space-y-12 min-w-0">
-
-            {/* Pinned community posts — grouped by category */}
-            {(loading || communityPosts.length > 0) && (() => {
-              const groups = {};
-              for (const post of communityPosts) {
-                const key = post.category?.trim() || "Community News";
-                if (!groups[key]) groups[key] = [];
-                groups[key].push(post);
-              }
-              const groupEntries = Object.entries(groups);
-
-              return (
-                <>
-                  {loading ? (
-                    <section>
-                      <SectionLabel>From the community</SectionLabel>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {[1, 2].map(i => (
-                          <div key={i} className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden">
-                            <Skeleton className="h-44 rounded-none" />
-                            <div className="p-5 space-y-2">
-                              <Skeleton className="h-2.5 w-16" />
-                              <Skeleton className="h-4 w-4/5" />
-                              <Skeleton className="h-3 w-full" />
-                              <Skeleton className="h-3 w-2/3" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  ) : (() => {
-                    // Groups with 2+ pinned posts fill their own 2-col grid
-                    // evenly and get a normal full-width section. Groups
-                    // with exactly one pinned post would otherwise sit
-                    // alone in that same grid with an empty cell beside
-                    // them — instead, pair those singleton groups up two
-                    // at a time so two different categories share a row.
-                    const fullGroups = groupEntries.filter(([, posts]) => posts.length !== 1);
-                    const singleGroups = groupEntries.filter(([, posts]) => posts.length === 1);
-                    const singlePairs = [];
-                    for (let i = 0; i < singleGroups.length; i += 2) {
-                      singlePairs.push(singleGroups.slice(i, i + 2));
-                    }
-
-                    const readAllButton = (
-                      <div className="mt-3 text-right">
-                        <button
-                          onClick={() => showNudge("Sign up to read all community updates.", () => navigate("/signup"), "/community-update")}
-                          className="text-[12px] font-semibold hover:underline transition-colors"
-                          style={{ color: "#d4af37" }}
-                        >
-                          Read all updates →
-                        </button>
-                      </div>
-                    );
-
-                    return (
-                      <>
-                        {fullGroups.map(([category, posts]) => (
-                          <section key={category}>
-                            <SectionLabel>{category}</SectionLabel>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {posts.map(post => (
-                                <CommunityCard key={post.id} post={post} onNudge={showNudge} />
-                              ))}
-                            </div>
-                            {readAllButton}
-                          </section>
-                        ))}
-
-                        {singlePairs.map((pair, i) => (
-                          <section key={`pinned-pair-${i}`}>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {pair.map(([category, posts]) => (
-                                <div key={category}>
-                                  <SectionLabel>{category}</SectionLabel>
-                                  <CommunityCard post={posts[0]} onNudge={showNudge} />
-                                </div>
-                              ))}
-                            </div>
-                            {readAllButton}
-                          </section>
-                        ))}
-                      </>
-                    );
-                  })()}
-                </>
-              );
-            })()}
-
-            {/* Latest threads + Active discussions — side by side */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-              <section>
-                <SectionLabel>Latest threads</SectionLabel>
-                <div className="bg-white border border-[#e8e0d0] rounded-2xl px-4 py-2">
-                  {loading ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                      <div key={i} className="flex gap-3 items-start py-3 border-b border-[#f0ebe3] last:border-b-0">
-                        <Skeleton className="w-8 h-8 rounded-full" />
-                        <div className="flex-1 space-y-1.5">
-                          <Skeleton className="h-3.5 w-4/5" />
-                          <Skeleton className="h-2.5 w-1/2" />
-                        </div>
-                      </div>
-                    ))
-                  ) : latestThreads.length > 0 ? (
-                    latestThreads.map(t => (
-                      <ThreadCard key={t.id} thread={t} onNudge={showNudge} />
-                    ))
-                  ) : (
-                    <p className="text-[13px] text-[#9a8c7a] py-6 text-center">No threads yet.</p>
-                  )}
-                </div>
-                <div className="mt-2 text-right">
-                  <button
-                    onClick={() => showNudge("Sign up to join the forum and start or reply to threads.", () => navigate("/signup"), "/threads")}
-                    className="text-[12px] font-semibold hover:underline"
-                    style={{ color: "#d4af37" }}
-                  >
-                    See all threads →
-                  </button>
-                </div>
-              </section>
-
-              <section>
-                <SectionLabel>Active discussions</SectionLabel>
-                <div className="bg-white border border-[#e8e0d0] rounded-2xl px-4 py-2">
-                  {loading ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                      <div key={i} className="flex gap-3 items-start py-3 border-b border-[#f0ebe3] last:border-b-0">
-                        <Skeleton className="w-8 h-8 rounded-full" />
-                        <div className="flex-1 space-y-1.5">
-                          <Skeleton className="h-3.5 w-4/5" />
-                          <Skeleton className="h-2.5 w-1/2" />
-                        </div>
-                      </div>
-                    ))
-                  ) : activeThreads.length > 0 ? (
-                    activeThreads.map(t => (
-                      <ThreadCard key={t.id} thread={t} onNudge={showNudge} />
-                    ))
-                  ) : (
-                    <p className="text-[13px] text-[#9a8c7a] py-6 text-center">Quiet in here — be the first to post!</p>
-                  )}
-                </div>
-              </section>
-            </div>
-
-            {/* Mid-page CTA banner */}
-            <section
-              className="rounded-2xl p-8 sm:p-10 text-center relative overflow-hidden"
-              style={{ background: "linear-gradient(135deg,#1a1a2e,#1e2d4a)" }}
+          {signedIn ? (
+            <button
+              onClick={goWorkspace}
+              className="px-8 py-3 rounded-xl font-semibold text-white text-[15px] hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: "hsl(var(--social-500))" }}
             >
-              <div className="absolute inset-0 pointer-events-none opacity-5"
-                style={{ backgroundImage: "radial-gradient(circle at 80% 20%, #d4af37 0%, transparent 60%)" }} />
-              <p className="relative text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: "#d4af37" }}>
-                Ready to write?
-              </p>
-              <h2 className="relative font-serif text-2xl sm:text-3xl text-white mb-6 leading-snug">
-                Stop planning to write.<br />Start writing.
-              </h2>
-              <div className="relative flex flex-col sm:flex-row gap-3 justify-center">
+              Go to your workspace →
+            </button>
+          ) : (
+            <div className="flex flex-col items-center gap-1.5">
+              <button
+                onClick={() => navigate("/login")}
+                className="px-8 py-3 rounded-xl font-semibold text-white text-[15px] hover:opacity-90 transition-opacity flex items-center gap-2"
+                style={{ backgroundColor: "hsl(var(--social-500))" }}
+              >
+                <LogIn className="h-4 w-4" /> Log in to get started
+              </button>
+              <button onClick={goSignup} className="text-xs text-ink-500 hover:text-ink-700 underline underline-offset-4">
+                New here? Create your account
+              </button>
+            </div>
+          )}
+        </Reveal>
+
+        {/* ── draft plan: pace graph + rings ──────────────────────────── */}
+        <Reveal className="mb-24 md:mb-32">
+          {(inView) => (
+            <div className="grid md:grid-cols-[minmax(0,300px)_1fr] gap-8 md:gap-16 items-center">
+              <div className="text-center md:text-left">
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                  <PenLine className="h-4 w-4" style={{ color: "hsl(var(--social-500))" }} />
+                  <p className="text-ink-700 font-medium">Draft Plan</p>
+                </div>
+                <p className="font-display text-2xl text-ink-900 mb-3">
+                  Watch the line move instead of wondering where you stand.
+                </p>
+                <p className="text-ink-500 text-sm leading-relaxed max-w-sm mx-auto md:mx-0">
+                  Every session you log fills these in — story progress, this week's
+                  target, today's goal.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card p-5 sm:p-7">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Writing activity</p>
+                    <p className="font-display text-lg text-ink-900">A writer's pace</p>
+                  </div>
+                  <div className="flex rounded-lg border border-border overflow-hidden">
+                    {["7", "15", "30"].map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => { setPeriod(p); setHoverIdx(null); }}
+                        className="px-3 py-1.5 text-xs font-semibold transition-colors"
+                        style={
+                          period === p
+                            ? { background: "hsl(var(--social-100))", color: "hsl(var(--social-700))" }
+                            : { color: "hsl(var(--ink-500))" }
+                        }
+                      >
+                        {p}d
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <svg
+                    viewBox={`0 0 ${width} ${height}`}
+                    preserveAspectRatio="none"
+                    className="w-full h-44"
+                    onMouseMove={handlePaceMove}
+                    onMouseLeave={() => setHoverIdx(null)}
+                  >
+                    <defs>
+                      <linearGradient id="about-pace-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(var(--social-500))" stopOpacity="0.28" />
+                        <stop offset="100%" stopColor="hsl(var(--social-500))" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    {yTicks.map((t) => {
+                      const y = padding.top + innerH - (t / axisMax) * innerH;
+                      return (
+                        <g key={t}>
+                          <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="hsl(var(--paper-border))" strokeDasharray="3 4" />
+                          <text x={padding.left - 10} y={y} textAnchor="end" dominantBaseline="middle" style={{ fontSize: "10px", fill: "hsl(var(--ink-500))" }}>{t}</text>
+                        </g>
+                      );
+                    })}
+                    <path d={areaPath} fill="url(#about-pace-fill)" stroke="none" />
+                    <path d={linePath} fill="none" stroke="hsl(var(--social-500))" strokeWidth="2.5" />
+                    {hovered && (
+                      <>
+                        <line x1={hovered.x} x2={hovered.x} y1={padding.top} y2={padding.top + innerH} stroke="hsl(var(--ink-200))" />
+                        <circle cx={hovered.x} cy={hovered.y} r="4.5" fill="hsl(var(--social-500))" stroke="white" strokeWidth="2" />
+                      </>
+                    )}
+                    {points.map((p, i) => (
+                      (i % labelEvery === 0 || i === points.length - 1) && (
+                        <text key={p.key} x={p.x} y={height - 6} textAnchor="middle" style={{ fontSize: "10px", fill: "hsl(var(--ink-500))" }}>{p.label}</text>
+                      )
+                    ))}
+                  </svg>
+
+                  {hovered && (
+                    <div
+                      className="absolute pointer-events-none bg-card border border-paper-border rounded-lg shadow-md px-3 py-2 whitespace-nowrap"
+                      style={{
+                        left: `${(hovered.x / width) * 100}%`,
+                        top: `${(hovered.y / height) * 100}%`,
+                        transform: `translate(${hovered.x / width > 0.85 ? "-100%" : hovered.x / width < 0.15 ? "0%" : "-50%"}, ${hovered.y / height < 0.3 ? "16px" : "-125%"})`,
+                      }}
+                    >
+                      <p className="text-xs text-ink-500">{hovered.label}</p>
+                      <p className="text-sm font-semibold text-ink-900">{hovered.count.toLocaleString()} words</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 sm:gap-8 mt-6 pt-6 border-t border-border">
+                  {RING_DEMO.map((ring, i) => (
+                    <DemoRing key={ring.label} {...ring} active={inView} delay={350 + i * 180} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </Reveal>
+
+        {/* ── mailbox: real greeting-card preview ─────────────────────── */}
+        <Reveal className="mb-24 md:mb-32">
+          {(inView) => (
+            <div className="grid md:grid-cols-[1fr_minmax(0,300px)] gap-8 md:gap-16 items-center">
+              <div className="order-2 md:order-1">
+                <div className="flex flex-wrap justify-center gap-2.5 mb-8">
+                  {CARD_TYPES.map((type, i) => {
+                    const theme = CARD_THEME[type];
+                    const Icon = CARD_ICONS[theme.icon];
+                    const active = type === activeType;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => setActiveType(type)}
+                        className={`qw-card rounded-xl border p-3.5 flex flex-col items-center gap-1.5 min-w-[84px] ${inView ? "qw-in" : "opacity-0"} ${active ? "qw-active" : ""}`}
+                        style={{
+                          "--tilt": `${TILT[i % TILT.length]}deg`,
+                          "--delay": `${i * 90}ms`,
+                          backgroundColor: theme.bg,
+                          borderColor: active ? theme.solid : theme.border,
+                          borderWidth: active ? "2px" : "1px",
+                        }}
+                      >
+                        <Icon className="h-4 w-4" style={{ color: theme.text }} />
+                        <span className="text-xs font-semibold" style={{ color: theme.text }}>{theme.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-center">
+                  <div key={activeType} className="qw-pop paper-card paper-card-fold w-full max-w-sm rounded-2xl overflow-hidden">
+                    <div className="relative h-24 overflow-hidden" style={{ background: activeTheme.bg }}>
+                      <CardDecoration type={activeType} color={activeTheme.solid} />
+                      <div className="relative h-full flex items-center justify-center">
+                        <div className="h-14 w-14 rounded-full flex items-center justify-center" style={{ background: activeTheme.solid }}>
+                          <ActiveIcon className="h-7 w-7 text-white" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-6 text-center">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: `color-mix(in srgb, ${activeTheme.solid} 75%, black)` }}>
+                        {activeTheme.label}
+                      </p>
+                      <p className="text-2xl font-semibold mb-1" style={{ fontFamily: "var(--font-card-display)", color: `color-mix(in srgb, ${activeTheme.solid} 75%, black)` }}>
+                        {activeCopy.title}
+                      </p>
+                      <p className="text-sm italic mb-5" style={{ fontFamily: "var(--font-paper-serif)", color: "rgba(35,28,22,0.55)" }}>
+                        {activeCopy.tagline}
+                      </p>
+                      <p className="text-sm italic leading-relaxed" style={{ fontFamily: "var(--font-paper-serif)", color: `color-mix(in srgb, ${activeTheme.solid} 55%, black)` }}>
+                        {activeTheme.placeholder}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="order-1 md:order-2 text-center md:text-left">
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                  <Mail className="h-4 w-4" style={{ color: "hsl(var(--social-500))" }} />
+                  <p className="text-ink-700 font-medium">Mailbox</p>
+                </div>
+                <p className="font-display text-2xl text-ink-900 mb-3">
+                  Send a card when someone needs one.
+                </p>
+                <p className="text-ink-500 text-sm leading-relaxed max-w-sm mx-auto md:mx-0 mb-6">
+                  A boost before they start, a well done after a hard session, a thank
+                  you for showing up. Tap a card to open it.
+                </p>
                 <button
-                  onClick={() => navigate("/draftplan/new")}
-                  className="px-7 py-3 rounded-xl font-semibold text-[#1a1a2e] text-[14px] transition-all hover:opacity-90"
-                  style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+                  onClick={goMailbox}
+                  className="px-6 py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: "hsl(var(--social-500))", color: "white" }}
                 >
-                  Start my draft plan
-                </button>
-                <button
-                  onClick={() => setShowChallengePicker(true)}
-                  className="px-7 py-3 rounded-xl font-semibold text-white text-[14px] border border-white/20 hover:bg-white/10 transition-all"
-                >
-                  Take the writing challenge
+                  {signedIn ? "Open your mailbox" : "Log in to send one"}
                 </button>
               </div>
-            </section>
-
-            {/* Bottom CTA — desktop only here; on mobile it renders after the sidebar */}
-            <section className="hidden lg:block rounded-2xl border border-[#e8e0d0] bg-white p-8 sm:p-12 text-center">
-              {user ? (
-                <>
-                  <p className="font-serif text-2xl sm:text-3xl text-[#1a1a2e] mb-3 leading-snug">
-                    Your draft isn't going to write itself.<br />
-                    <span style={{ color: "#d4af37" }}>But we can help.</span>
-                  </p>
-                  <p className="text-[14px] text-[#9a8c7a] mb-7 max-w-md mx-auto">
-                    Track progress, take a challenge, get critique — pick up where you left off.
-                  </p>
-                  <button
-                    onClick={() => navigate("/draftplan")}
-                    className="inline-block px-10 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
-                    style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
-                  >
-                    Go to my draft plan →
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="font-serif text-2xl sm:text-3xl text-[#1a1a2e] mb-3 leading-snug">
-                    Your draft isn't going to write itself.<br />
-                    <span style={{ color: "#d4af37" }}>But we can help.</span>
-                  </p>
-                  <p className="text-[14px] text-[#9a8c7a] mb-7 max-w-md mx-auto">
-                    Track progress, take challenges, get critique — everything a writing community should do.
-                  </p>
-                  <button
-                    onClick={() => navigate("/signup")}
-                    className="inline-block px-10 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
-                    style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
-                  >
-                    Join for free →
-                  </button>
-                  <p className="text-[12px] text-[#c5bfb5] mt-4">No credit card. No catch. Just writing.</p>
-                </>
-              )}
-            </section>
-          </div>
-
-          {/* ── SIDEBAR COLUMN ────────────────────────────────────────────── */}
-          <aside className="lg:sticky lg:top-6">
-            {sidebar}
-          </aside>
-
-        </div>
-
-        {/* Bottom CTA — mobile only, appears after the sidebar widgets */}
-        <section className="lg:hidden mt-8 rounded-2xl border border-[#e8e0d0] bg-white p-8 text-center">
-          {user ? (
-            <>
-              <p className="font-serif text-2xl text-[#1a1a2e] mb-3 leading-snug">
-                Your draft isn't going to write itself.<br />
-                <span style={{ color: "#d4af37" }}>But we can help.</span>
-              </p>
-              <p className="text-[14px] text-[#9a8c7a] mb-7 max-w-md mx-auto">
-                Track progress, take a challenge, get critique — pick up where you left off.
-              </p>
-              <button
-                onClick={() => navigate("/draftplan")}
-                className="inline-block px-10 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
-                style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
-              >
-                Go to my draft plan →
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="font-serif text-2xl text-[#1a1a2e] mb-3 leading-snug">
-                Your draft isn't going to write itself.<br />
-                <span style={{ color: "#d4af37" }}>But we can help.</span>
-              </p>
-              <p className="text-[14px] text-[#9a8c7a] mb-7 max-w-md mx-auto">
-                Track progress, take challenges, get critique — everything a writing community should do.
-              </p>
-              <button
-                onClick={() => navigate("/signup")}
-                className="inline-block px-10 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
-                style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
-              >
-                Join for free →
-              </button>
-              <p className="text-[12px] text-[#c5bfb5] mt-4">No credit card. No catch. Just writing.</p>
-            </>
+            </div>
           )}
-        </section>
-      </main>
+        </Reveal>
 
-      {/* ── FOOTER ────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-[#e8e0d0] mt-8 py-8 px-5 text-center">
-        <p className="font-serif text-[#1a1a2e] text-sm mb-1">Quillweave</p>
-        <p className="text-[12px] text-[#9a8c7a]">A home for writers with more ideas than finished drafts.</p>
-      </footer>
+        {/* ── founding writers ─────────────────────────────────────────── */}
+        <Reveal className="mb-24 md:mb-32">
+          <div className="text-center max-w-lg mx-auto mb-8">
+            <p className="font-display text-2xl text-ink-900 mb-2">Meet the Founding Writers</p>
+            <p className="text-ink-500 text-sm leading-relaxed">
+              The first writers who showed up before there was any proof this
+              would work. Follow one to see their story unfold.
+            </p>
+          </div>
+          <FoundingWritersCarousel variant="about" />
+        </Reveal>
+
+        {/* ── brag card ────────────────────────────────────────────────── */}
+        <Reveal className="mb-20">
+          {(inView) => (
+            <div className="grid md:grid-cols-[minmax(0,280px)_1fr] gap-8 md:gap-16 items-center">
+              <div className="text-center md:text-left">
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                  <Sparkles className="h-4 w-4" style={{ color: "hsl(var(--highlight-500))" }} />
+                  <p className="text-ink-700 font-medium">Brag a little</p>
+                </div>
+                <p className="font-display text-2xl text-ink-900 mb-3">Proof, not just a vibe.</p>
+                <p className="text-ink-500 text-sm leading-relaxed max-w-sm mx-auto md:mx-0">
+                  Hit today's goal and QuillWeave hands you a card for it — you're
+                  one of the writers actually showing up.
+                </p>
+              </div>
+
+              <div className="max-w-md w-full mx-auto md:mx-0">
+                <div className="rounded-2xl border border-border bg-card p-5">
+                  <div className="rounded-xl p-4" style={{ background: "hsl(var(--paper-muted))" }}>
+                    <p className="text-sm text-ink-700 mb-3">The Last Ember — Chapter Seven</p>
+
+                    <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "hsl(var(--highlight-700))" }}>
+                      Today's goal
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <DemoRing tone="highlight" label="" value={100} active={inView} delay={300} size={64} />
+                      <div>
+                        <p className="text-lg font-display font-semibold text-ink-900">920 / 800 words</p>
+                        <p className="text-xs flex items-center gap-1" style={{ color: "hsl(var(--success-700))" }}>
+                          <Check className="h-3 w-3" /> Goal hit, with 120 to spare
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs font-semibold uppercase tracking-wide mt-4 mb-1.5" style={{ color: "hsl(var(--achievement-700))" }}>
+                      Weekly target
+                    </p>
+                    <div className="h-2 rounded-full bg-paper-border overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: inView ? "78%" : "0%", backgroundColor: "hsl(var(--achievement-500))", transition: "width 900ms cubic-bezier(0.22, 1, 0.36, 1) 500ms" }} />
+                    </div>
+
+                    <p className="text-xs font-semibold uppercase tracking-wide mt-4 mb-2" style={{ color: "hsl(var(--quest-700))" }}>
+                      Words discovered today
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {TILE_WORDS.map((w) => (
+                        <span key={w} className="font-display font-semibold text-sm rounded-lg px-3 py-1.5" style={{ background: "hsl(var(--quest-100))", color: "hsl(var(--quest-700))" }}>
+                          {w}
+                        </span>
+                      ))}
+                    </div>
+
+                    <p className="text-[11px] text-ink-500 text-center mt-4">#MakeItExist · via QuillWeave</p>
+                  </div>
+
+                  <button
+                    onClick={goLogSession}
+                    className="w-full mt-4 px-6 py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+                    style={{ backgroundColor: "hsl(var(--highlight-500))", color: "white" }}
+                  >
+                    <Sparkles className="h-4 w-4" /> {signedIn ? "Log today's session" : "Log in to start your own"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Reveal>
+
+        {/* ── final CTA ────────────────────────────────────────────────── */}
+        <Reveal className="text-center">
+          {signedIn ? (
+            <button
+              onClick={goWorkspace}
+              className="px-8 py-3 rounded-xl font-semibold text-white text-[15px] hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: "hsl(var(--social-500))" }}
+            >
+              Go to your workspace →
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate("/login")}
+              className="px-8 py-3 rounded-xl font-semibold text-white text-[15px] hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+              style={{ backgroundColor: "hsl(var(--social-500))" }}
+            >
+              <LogIn className="h-4 w-4" /> Log in to get started
+            </button>
+          )}
+        </Reveal>
+      </div>
     </div>
   );
+}
+
+// ── scroll reveal wrapper ────────────────────────────────────────────────
+// Fades/slides each section in the first time it enters the viewport, then
+// disconnects (no re-triggering on scroll back up/down). Accepts either
+// plain children or a render-prop function that receives `inView`, so a
+// section can drive its own demo animation (rings, progress bars) off the
+// same trigger instead of a single global mount-timer.
+function Reveal({ children, className = "" }) {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -10% 0px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={`qw-section ${inView ? "qw-section-in" : ""} ${className}`}>
+      {typeof children === "function" ? children(inView) : children}
+    </div>
+  );
+}
+
+// ── demo ring ────────────────────────────────────────────────────────────
+//
+// Same geometry/transition as RingCard in draftPlanPage.jsx — held at
+// zero until `active` flips true, so the fill-in reads as part of the
+// page's one entrance beat rather than firing off-screen.
+function DemoRing({ tone, label, value, active, delay, size = 68 }) {
+  const [filled, setFilled] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    const t = setTimeout(() => setFilled(true), delay);
+    return () => clearTimeout(t);
+  }, [active, delay]);
+
+  const r = size * 0.44;
+  const c = 2 * Math.PI * r;
+  const shown = filled ? value : 0;
+  const offset = c - (shown / 100) * c;
+  const center = size / 2;
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <g transform={`rotate(-90 ${center} ${center})`}>
+          <circle cx={center} cy={center} r={r} fill="none" stroke={`hsl(var(--${tone}-100))`} strokeWidth="6" />
+          <circle
+            cx={center} cy={center} r={r} fill="none"
+            stroke={`hsl(var(--${tone}-500))`} strokeWidth="6" strokeLinecap="round"
+            strokeDasharray={c} strokeDashoffset={offset}
+            style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+          />
+        </g>
+        <text x={center} y={center} textAnchor="middle" dominantBaseline="central" className="font-display font-semibold" style={{ fill: `hsl(var(--${tone}-700))`, fontSize: "13px" }}>
+          {shown}%
+        </text>
+      </svg>
+      {label && <span className="text-[11px] text-ink-500 text-center leading-tight">{label}</span>}
+    </div>
+  );
+}
+
+// ── card decoration ──────────────────────────────────────────────────────
+//
+// Verbatim from mailboxpage.jsx's CardDecoration — one motif per card
+// type, drawn with the card's own theme color, pure vector. Kept in sync
+// with that file by hand; if CARD_THEME ever grows a new type, add its
+// case in both places.
+function CardDecoration({ type, color }) {
+  switch (type) {
+    case "WELCOME":
+      return (
+        <svg viewBox="0 0 400 96" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+          <path d="M0,74 Q50,60 100,74 T200,74 T300,74 T400,74" fill="none" stroke={color} strokeOpacity="0.25" strokeWidth="1.5" />
+          {[36, 108, 180, 252, 320, 372].map((x, i) => (
+            <g key={i} transform={`translate(${x},${26 + (i % 2) * 10})`}>
+              <g fill={color} fillOpacity="0.85">
+                <circle cx="0" cy="-7" r="6" />
+                <circle cx="7" cy="0" r="6" />
+                <circle cx="0" cy="7" r="6" />
+                <circle cx="-7" cy="0" r="6" />
+              </g>
+              <circle cx="0" cy="0" r="3.5" fill="white" fillOpacity="0.9" />
+            </g>
+          ))}
+        </svg>
+      );
+    case "CONGRATS":
+      return (
+        <svg viewBox="0 0 400 96" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+          <path d="M0,22 Q100,6 200,22 T400,22" fill="none" stroke={color} strokeOpacity="0.2" strokeWidth="1.5" strokeDasharray="2 6" />
+          {[[30, 30, 10], [92, 55, 7], [152, 24, 13], [222, 50, 8], [284, 22, 11], [344, 48, 9]].map(([x, y, s], i) => (
+            <path key={i} transform={`translate(${x},${y})`} fill={color} fillOpacity={i % 2 ? 0.55 : 0.9} d={starPath(s)} />
+          ))}
+          {[[60, 66], [190, 60], [258, 34], [366, 60]].map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r="2.5" fill={color} fillOpacity="0.5" />
+          ))}
+        </svg>
+      );
+    case "WELL_DONE":
+      return (
+        <svg viewBox="0 0 400 96" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+          <path d="M10,22 L390,22" stroke={color} strokeOpacity="0.4" strokeWidth="1.5" strokeDasharray="1 8" strokeLinecap="round" />
+          {[50, 130, 210, 290, 360].map((x, i) => (
+            <g key={i} transform={`translate(${x},22)`}>
+              <line x1="0" y1="0" x2="0" y2={14 + (i % 2) * 8} stroke={color} strokeOpacity="0.35" strokeWidth="1" />
+              <path transform={`translate(0,${20 + (i % 2) * 8})`} fill={color} fillOpacity="0.9" d={starPath(9)} />
+            </g>
+          ))}
+        </svg>
+      );
+    case "THANK_YOU":
+      return (
+        <svg viewBox="0 0 400 96" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+          <path d="M10,20 L390,20" stroke={color} strokeOpacity="0.4" strokeWidth="1.5" strokeLinecap="round" />
+          {[45, 122, 200, 280, 355].map((x, i) => (
+            <g key={i} transform={`translate(${x},20)`}>
+              <line x1="0" y1="0" x2="0" y2={10 + (i % 2) * 6} stroke={color} strokeOpacity="0.35" strokeWidth="1" />
+              <path
+                transform={`translate(-7,${14 + (i % 2) * 6}) scale(0.9)`}
+                fill={color}
+                fillOpacity="0.9"
+                d="M7,13 C2,9 0,6 0,3.5 C0,1.5 1.5,0 3.5,0 C5,0 6.2,0.8 7,2 C7.8,0.8 9,0 10.5,0 C12.5,0 14,1.5 14,3.5 C14,6 12,9 7,13 Z"
+              />
+            </g>
+          ))}
+        </svg>
+      );
+    case "BOOSTER":
+      return (
+        <svg viewBox="0 0 400 96" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+          {[[0, 70, 90, 40], [40, 90, 150, 55], [90, 30, 170, 5], [220, 85, 320, 45], [270, 20, 380, -10]].map(([x1, y1, x2, y2], i) => (
+            <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeOpacity={0.2 + (i % 2) * 0.15} strokeWidth="3" strokeLinecap="round" />
+          ))}
+          {[[130, 62, 7], [230, 22, 9], [330, 60, 6]].map(([x, y, s], i) => (
+            <path
+              key={i}
+              transform={`translate(${x},${y})`}
+              fill={color}
+              fillOpacity="0.85"
+              d={`M0,-${s} Q${s * 0.3},-${s * 0.3} ${s},0 Q${s * 0.3},${s * 0.3} 0,${s} Q-${s * 0.3},${s * 0.3} -${s},0 Q-${s * 0.3},-${s * 0.3} 0,-${s} Z`}
+            />
+          ))}
+        </svg>
+      );
+    case "BIRTHDAY":
+      return (
+        <svg viewBox="0 0 400 96" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+          {[[24, 20], [70, 55], [118, 15], [168, 60], [216, 24], [262, 58], [310, 18], [360, 52], [46, 40], [285, 38]].map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 4 : 2.5} fill={color} fillOpacity={i % 2 ? 0.5 : 0.85} />
+          ))}
+          {[150, 250].map((x, i) => (
+            <g key={i} transform={`translate(${x},34)`}>
+              <rect x="-3" y="0" width="6" height="20" rx="1.5" fill={color} fillOpacity="0.85" />
+              <path d="M0,-10 C4,-6 4,-1 0,2 C-4,-1 -4,-6 0,-10 Z" fill={color} fillOpacity="0.6" />
+            </g>
+          ))}
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+// Ten-point star path centered on (0,0), outer radius r — same as
+// mailboxpage.jsx's starPath, used by CardDecoration above.
+function starPath(r) {
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const angle = (Math.PI / 5) * i - Math.PI / 2;
+    const radius = i % 2 === 0 ? r : r * 0.42;
+    pts.push(`${(radius * Math.cos(angle)).toFixed(2)},${(radius * Math.sin(angle)).toFixed(2)}`);
+  }
+  return `M${pts.join(" L")}Z`;
 }

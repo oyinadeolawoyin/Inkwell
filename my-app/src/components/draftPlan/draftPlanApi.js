@@ -1,112 +1,58 @@
-// src/components/draftplan/draftPlanApi.js
+// src/components/draftPlan/draftPlanApi.js
+//
+// Multi-plan note: a writer can hold several draft plans at once now, so
+// every plan-scoped endpoint below is nested under /:planId on the backend
+// (see draftplanroutes.js). Every function that touches a specific plan
+// takes `planId` as its first argument — callers get it from the route
+// (e.g. `/draftplan/:planId`) or from getMyPlans()/the workspace's
+// weekly-goal-plan spotlight.
 
 import API_URL from "../../config/api";
 
-async function parseJsonSafe(res) {
-  try { return await res.json(); } catch { return null; }
-}
+const BASE = `${API_URL}/draftplan`;
 
-// GET /draftplan/mine
-export async function fetchMyPlan() {
-  const res = await fetch(`${API_URL}/draftplan/mine`, { credentials: "include" });
-  if (res.status === 404) return null;
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data?.message ?? "Couldn't load your draft plan.");
-  return data?.plan ?? null;
-}
-
-// POST /draftplan
-export async function createDraftPlan(payload) {
-  const res = await fetch(`${API_URL}/draftplan`, {
-    method: "POST",
+async function request(path, options = {}) {
+  const res = await fetch(`${BASE}${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    headers: options.body instanceof FormData
+      ? undefined
+      : { "Content-Type": "application/json" },
+    ...options,
   });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data?.message ?? "Couldn't create your draft plan.");
-  return data?.plan;
-}
-
-// PATCH /draftplan
-export async function updateDraftPlan(payload) {
-  const res = await fetch(`${API_URL}/draftplan`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data?.message ?? "Couldn't update your draft plan.");
-  return data?.plan;
-}
-
-// DELETE /draftplan
-export async function deleteDraftPlan() {
-  const res = await fetch(`${API_URL}/draftplan`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data?.message ?? "Couldn't delete your draft plan.");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || "Something went wrong.");
   return data;
 }
 
-// POST /draftplan/progress
-export async function logProgress({ countLogged, note, logDate, direction }) {
-  const res = await fetch(`${API_URL}/draftplan/progress`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ countLogged, note, logDate, direction }),
-  });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data?.message ?? "Couldn't log your progress.");
-  return data;
+// ── Plan list ────────────────────────────────────────────────────────────
+// Every plan this writer owns — lightweight (no logs/timeline), used by the
+// plan switcher and the workspace's "Draft Plans" button.
+export const getMyPlans = () => request("/mine", { method: "GET" });
+
+// ── Plan ─────────────────────────────────────────────────────────────────
+export const createPlan  = (payload)          => request("/",             { method: "POST",  body: JSON.stringify(payload) });
+export const getMyPlan   = (planId)           => request(`/${planId}`,    { method: "GET" });
+export const updatePlan  = (planId, payload)  => request(`/${planId}`,    { method: "PATCH", body: JSON.stringify(payload) });
+export const deletePlan  = (planId)           => request(`/${planId}`,    { method: "DELETE" });
+
+// ── Timeline & history ──────────────────────────────────────────────────
+export const getTimeline    = (planId)          => request(`/${planId}/timeline`, { method: "GET" });
+export const getPlanHistory = (planId)          => request(`/${planId}/history`,  { method: "GET" });
+export const planDay        = (planId, payload) => request(`/${planId}/day-plan`, { method: "PATCH", body: JSON.stringify(payload) });
+
+// ── Moodboard ────────────────────────────────────────────────────────────
+export function uploadMoodboardImage(planId, file) {
+  const form = new FormData();
+  form.append("image", file);
+  return request(`/${planId}/upload-image`, { method: "POST", body: form });
 }
 
-// GET /draftplan/active
-export async function fetchActiveDraftWriters() {
-  const res = await fetch(`${API_URL}/draftplan/active`, { credentials: "include" });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data?.message ?? "Couldn't load active writers.");
-  return data?.writers ?? data ?? [];
-}
+// ── Progress ─────────────────────────────────────────────────────────────
+export const logProgress = (planId, payload) => request(`/${planId}/progress`, { method: "POST", body: JSON.stringify(payload) });
 
-// GET /draftplan/logged-today
-export async function fetchWritersWhoLoggedToday() {
-  const res = await fetch(`${API_URL}/draftplan/logged-today`, { credentials: "include" });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data?.message ?? "Couldn't load today's writers.");
-  return data?.writers ?? data ?? [];
-}
-
-// GET /draftplan/scheduled-today
-// Authenticated — returns [] if the current user doesn't have today as a
-// writing day themselves (enforced server-side, not just hidden here).
-// Includes peers who've already logged today (hasLoggedToday) alongside
-// those still getting ready.
-export async function fetchWritersScheduledToday() {
-  const res = await fetch(`${API_URL}/draftplan/scheduled-today`, { credentials: "include" });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data?.message ?? "Couldn't load today's scheduled writers.");
-  return data?.writers ?? data ?? [];
-}
-
-// POST /draftplan/upload-image
-// Uses the same multer/supabase pipeline as thread media uploads.
-// Returns the public URL string.
-export async function uploadMoodboardImage(file) {
-  const formData = new FormData();
-  formData.append("image", file);
-
-  const res = await fetch(`${API_URL}/draftplan/upload-image`, {
-    method: "POST",
-    credentials: "include",
-    body: formData,
-    // Do NOT set Content-Type — browser sets it with the correct multipart boundary
-  });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data?.message ?? "Couldn't upload that image.");
-  return data?.url;
-}
+// ── Bonus Quest ──────────────────────────────────────────────────────────
+export const openBonusQuest        = (planId, payload = {}) => request(`/${planId}/bonus-quest`,          { method: "POST", body: JSON.stringify(payload) });
+export const pickBonusQuestPrompt  = (planId, payload)       => request(`/${planId}/bonus-quest/pick`,     { method: "POST", body: JSON.stringify(payload) });
+export const declineBonusQuest     = (planId, payload = {}) => request(`/${planId}/bonus-quest/decline`,  { method: "POST", body: JSON.stringify(payload) });
+export const getTodaysBonusQuest   = (planId)                => request(`/${planId}/bonus-quest/today`,   { method: "GET" });
+export const logBonusQuestProgress = (planId, payload)       => request(`/${planId}/bonus-quest/progress`, { method: "POST", body: JSON.stringify(payload) });

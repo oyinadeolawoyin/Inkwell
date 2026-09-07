@@ -15,6 +15,15 @@ export async function fetchConversations() {
   return Array.isArray(data) ? data : [];
 }
 
+// GET /direct-messages/unread-count
+// Powers the Inbox sidebar badge — same shape as mailbox's getMailboxUnreadCount.
+export async function getMessagesUnreadCount() {
+  const res = await fetch(`${API_URL}/direct-messages/unread-count`, { credentials: "include" });
+  const data = await parseJsonSafe(res);
+  if (!res.ok) throw new Error(data?.message ?? "Couldn't load unread count.");
+  return data; // { count }
+}
+
 // POST /direct-messages/conversations/:userId
 // Opens or returns the existing conversation room with another user.
 // Safe to call repeatedly — idempotent.

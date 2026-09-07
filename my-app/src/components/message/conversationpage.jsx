@@ -4,8 +4,9 @@
 // at the bottom. Clicking "Reply" on any message pre-fills a quote bubble
 // above the compose box.
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, Reply, Trash2, Send, X } from "lucide-react";
 import { useAuth } from "../auth/authContext";
 import {
   fetchMessages,
@@ -13,43 +14,6 @@ import {
   deleteMessage as apiDeleteMessage,
   markConversationRead,
 } from "./directmessageapi";
-
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
-const ReplyIcon = (p) => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <path d="M9 17l-5-5 5-5" />
-    <path d="M20 18v-2a4 4 0 00-4-4H4" />
-  </svg>
-);
-
-const TrashIcon = (p) => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-    <path d="M10 11v6M14 11v6" />
-    <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
-  </svg>
-);
-
-const SendIcon = (p) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-  </svg>
-);
-
-const CloseIcon = (p) => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <path d="M18 6L6 18M6 6l12 12" />
-  </svg>
-);
-
-const BackIcon = (p) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <path d="M19 12H5M12 5l-7 7 7 7" />
-  </svg>
-);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -77,8 +41,11 @@ function Avatar({ username, avatar, size = 32 }) {
   }
   return (
     <div
-      className="rounded-full flex items-center justify-center flex-shrink-0 font-serif font-bold text-[#1a1a2e]"
-      style={{ width: size, height: size, background: "#fdf9ed", fontSize: size * 0.38, border: "1.5px solid #f0d98a" }}
+      className="rounded-full flex items-center justify-center flex-shrink-0 font-display font-semibold"
+      style={{
+        width: size, height: size, fontSize: size * 0.38,
+        backgroundColor: "hsl(var(--social-500))", color: "white",
+      }}
     >
       {username?.charAt(0).toUpperCase() ?? "?"}
     </div>
@@ -89,23 +56,26 @@ function Avatar({ username, avatar, size = 32 }) {
 
 function QuoteBubble({ quote, onClear }) {
   return (
-    <div className="flex items-start gap-2 px-3 py-2 rounded-lg mb-2" style={{ background: "#fdf9ed", border: "1px solid #f0d98a" }}>
-      <div className="w-[3px] self-stretch rounded-full flex-shrink-0" style={{ background: "#d4af37" }} />
+    <div
+      className="flex items-start gap-2 px-3 py-2 rounded-lg mb-2 border"
+      style={{ backgroundColor: "hsl(var(--secondary))", borderColor: "hsl(var(--border))" }}
+    >
+      <div className="w-[3px] self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: "hsl(var(--social-500))" }} />
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-[#b8860b] mb-0.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "hsl(var(--social-500))" }}>
           Replying to {quote.senderName}
         </p>
-        <p className="text-[12px] text-[#6b5c4a] truncate">
+        <p className="text-xs text-ink-500 truncate">
           {quote.content ?? "Deleted message"}
         </p>
       </div>
       <button
         type="button"
         onClick={onClear}
-        className="text-[#9a8c7a] hover:text-[#c0392b] transition-colors flex-shrink-0 mt-0.5"
+        className="text-ink-500 hover:text-ink-900 transition-colors flex-shrink-0 mt-0.5"
         aria-label="Cancel reply"
       >
-        <CloseIcon />
+        <X className="h-3.5 w-3.5" />
       </button>
     </div>
   );
@@ -132,13 +102,15 @@ function MessageBubble({ msg, isMine, onReply, onDelete }) {
         {/* Quoted message — shown above the bubble if this is a reply */}
         {msg.quotedMessage && (
           <div
-            className={`flex items-start gap-1.5 mb-1 px-3 py-1.5 rounded-lg max-w-full ${isMine ? "items-end" : "items-start"}`}
-            style={{ background: "#fdf9ed", border: "1px solid #f0d98a" }}
+            className="flex items-start gap-1.5 mb-1 px-3 py-1.5 rounded-lg max-w-full border"
+            style={{ backgroundColor: "hsl(var(--secondary))", borderColor: "hsl(var(--border))" }}
           >
-            <div className="w-[2px] self-stretch rounded-full flex-shrink-0" style={{ background: "#d4af37" }} />
+            <div className="w-[2px] self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: "hsl(var(--social-500))" }} />
             <div className="min-w-0">
-              <p className="text-[10px] font-bold text-[#b8860b] mb-0.5">{msg.quotedMessage.senderName}</p>
-              <p className="text-[11px] text-[#6b5c4a] truncate">
+              <p className="text-[10px] font-semibold mb-0.5" style={{ color: "hsl(var(--social-500))" }}>
+                {msg.quotedMessage.senderName}
+              </p>
+              <p className="text-[11px] text-ink-500 truncate">
                 {msg.quotedMessage.content ?? "Deleted message"}
               </p>
             </div>
@@ -147,20 +119,20 @@ function MessageBubble({ msg, isMine, onReply, onDelete }) {
 
         {/* Bubble */}
         <div
-          className="px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed break-words"
+          className="px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words"
           style={
             isMine
-              ? { background: "#1a1a2e", color: "#f5f3ef", borderBottomRightRadius: 4 }
-              : { background: "white", color: "#1a1a2e", border: "1px solid #e8e0d0", borderBottomLeftRadius: 4 }
+              ? { backgroundColor: "hsl(var(--social-500))", color: "white", borderBottomRightRadius: 4 }
+              : { backgroundColor: "hsl(var(--card))", color: "hsl(var(--ink-900))", border: "1px solid hsl(var(--border))", borderBottomLeftRadius: 4 }
           }
         >
           {msg.isDeleted
-            ? <span className="italic" style={{ opacity: 0.5 }}>Message deleted</span>
+            ? <span className="italic" style={{ opacity: 0.6 }}>Message deleted</span>
             : msg.content}
         </div>
 
         {/* Timestamp */}
-        <p className="text-[10px] text-[#c2b8a8] mt-1 px-1">{formatTime(msg.createdAt)}</p>
+        <p className="text-[10px] text-ink-500 mt-1 px-1">{formatTime(msg.createdAt)}</p>
       </div>
 
       {/* Action buttons — appear on hover */}
@@ -171,19 +143,22 @@ function MessageBubble({ msg, isMine, onReply, onDelete }) {
           <button
             type="button"
             onClick={() => onReply(msg)}
-            className="p-1.5 rounded-lg text-[#9a8c7a] hover:text-[#b8860b] hover:bg-[#fdf9ed] transition-colors"
+            className="p-1.5 rounded-lg text-ink-500 hover:text-social-500 hover:bg-secondary transition-colors"
             title="Reply"
           >
-            <ReplyIcon />
+            <Reply className="h-3.5 w-3.5" />
           </button>
           {isMine && (
             <button
               type="button"
               onClick={() => onDelete(msg.id)}
-              className="p-1.5 rounded-lg text-[#9a8c7a] hover:text-[#c0392b] hover:bg-[#fdf2f0] transition-colors"
+              className="p-1.5 rounded-lg text-ink-500 transition-colors"
+              style={{ }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "hsl(var(--highlight-500))"; e.currentTarget.style.backgroundColor = "hsl(var(--highlight-100))"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = ""; e.currentTarget.style.backgroundColor = ""; }}
               title="Delete"
             >
-              <TrashIcon />
+              <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -207,9 +182,9 @@ function DateDivider({ date }) {
 
   return (
     <div className="flex items-center gap-3 my-4">
-      <div className="flex-1 h-px" style={{ background: "#f0ebe3" }} />
-      <span className="text-[10px] font-bold uppercase tracking-wide text-[#c2b8a8] flex-shrink-0">{label}</span>
-      <div className="flex-1 h-px" style={{ background: "#f0ebe3" }} />
+      <div className="flex-1 h-px bg-border" />
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-500 flex-shrink-0">{label}</span>
+      <div className="flex-1 h-px bg-border" />
     </div>
   );
 }
@@ -223,7 +198,6 @@ export default function ConversationPage() {
   const navigate = useNavigate();
 
   const [messages, setMessages] = useState([]);
-  const [otherUser, setOtherUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -237,7 +211,6 @@ export default function ConversationPage() {
   // The message the user clicked "Reply" on — null means composing fresh
   const [replyTo, setReplyTo] = useState(null);
 
-  const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -252,8 +225,6 @@ export default function ConversationPage() {
         setMessages([...(data.messages ?? [])].reverse());
         setHasMore(data.hasMore ?? false);
         setNextCursor(data.nextCursor ?? null);
-        // Try to pull the other user's info from the first message
-        // (the backend includes senderUsername/Avatar on each message)
       })
       .catch((err) => setError(err.message ?? "Couldn't load conversation."))
       .finally(() => setLoading(false));
@@ -304,6 +275,7 @@ export default function ConversationPage() {
       setMessages((prev) => [...prev, newMsg]);
       setDraft("");
       setReplyTo(null);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
       // Scroll to bottom after sending
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     } catch (err) {
@@ -371,29 +343,29 @@ export default function ConversationPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.6875rem)]">
+    <div className="flex flex-col h-[calc(100vh-3.6875rem)] bg-background">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 sm:px-6 py-3.5 bg-white border-b border-[#e8e0d0] flex-shrink-0">
+      <div className="flex items-center gap-3 px-4 sm:px-6 py-3.5 bg-card border-b border-border flex-shrink-0">
         <button
           type="button"
           onClick={() => navigate("/messages")}
-          className="p-1.5 -ml-1 rounded-lg text-[#9a8c7a] hover:text-[#1a1a2e] hover:bg-[#f7f4ee] transition-colors"
+          className="p-1.5 -ml-1 rounded-lg text-ink-500 hover:text-ink-900 hover:bg-secondary transition-colors"
           aria-label="Back to inbox"
         >
-          <BackIcon />
+          <ArrowLeft className="h-[18px] w-[18px]" />
         </button>
 
         <Avatar username={otherName} avatar={otherAvatar} size={36} />
 
         <div className="flex-1 min-w-0">
-          <p className="text-[14px] font-bold text-[#1a1a2e] leading-tight truncate">{otherName}</p>
-          <p className="text-[11px] text-[#9a8c7a]">Private message</p>
+          <p className="text-sm font-semibold text-ink-900 leading-tight truncate">{otherName}</p>
+          <p className="text-[11px] text-ink-500">Private message</p>
         </div>
       </div>
 
       {/* ── Message list ───────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4" style={{ background: "#fafaf9" }}>
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
 
         {/* Load more */}
         {hasMore && (
@@ -402,7 +374,8 @@ export default function ConversationPage() {
               type="button"
               onClick={loadMore}
               disabled={loadingMore}
-              className="text-[12px] font-semibold text-[#b8860b] hover:underline disabled:opacity-50"
+              className="text-xs font-semibold hover:underline disabled:opacity-50"
+              style={{ color: "hsl(var(--social-500))" }}
             >
               {loadingMore ? "Loading…" : "Load older messages"}
             </button>
@@ -413,8 +386,8 @@ export default function ConversationPage() {
           <div className="space-y-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className={`flex items-end gap-2 ${i % 2 === 0 ? "flex-row-reverse" : ""}`}>
-                <div className="w-8 h-8 rounded-full bg-[#f0ebe3] flex-shrink-0 animate-pulse" />
-                <div className="h-10 rounded-2xl bg-[#f0ebe3] animate-pulse" style={{ width: `${100 + i * 40}px` }} />
+                <div className="w-8 h-8 rounded-full bg-secondary flex-shrink-0 animate-pulse" />
+                <div className="h-10 rounded-2xl bg-secondary animate-pulse" style={{ width: `${100 + i * 40}px` }} />
               </div>
             ))}
           </div>
@@ -422,13 +395,13 @@ export default function ConversationPage() {
 
         {!loading && error && (
           <div className="text-center py-8">
-            <p className="text-[13px] text-[#c0392b]">{error}</p>
+            <p className="text-sm" style={{ color: "hsl(var(--highlight-500))" }}>{error}</p>
           </div>
         )}
 
         {!loading && !error && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-            <p className="text-[13px] text-[#9a8c7a]">No messages yet. Say hello!</p>
+            <p className="text-sm text-ink-500">No messages yet. Say hello!</p>
           </div>
         )}
 
@@ -455,7 +428,7 @@ export default function ConversationPage() {
       </div>
 
       {/* ── Compose area ───────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 bg-white border-t border-[#e8e0d0] px-4 sm:px-6 py-3">
+      <div className="flex-shrink-0 bg-card border-t border-border px-4 sm:px-6 py-4">
 
         {/* Quote bubble when replying */}
         {replyTo && (
@@ -466,9 +439,11 @@ export default function ConversationPage() {
         )}
 
         {sendError && (
-          <p className="text-[12px] text-[#c0392b] mb-2">{sendError}</p>
+          <p className="text-xs mb-2" style={{ color: "hsl(var(--highlight-500))" }}>{sendError}</p>
         )}
 
+        {/* Compact single-line compose box — grows a little as you type,
+            same shape as before, just dark-theme colors. */}
         <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}
@@ -477,8 +452,15 @@ export default function ConversationPage() {
             onKeyDown={handleKeyDown}
             placeholder="Write a message… (Enter to send)"
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-[#e8e0d0] bg-[#fafaf9] px-3.5 py-2.5 text-[13px] text-[#1a1a2e] placeholder-[#c2b8a8] focus:outline-none focus:border-[#d4af37] transition-colors leading-relaxed"
-            style={{ minHeight: 42, maxHeight: 120 }}
+            className="flex-1 resize-none rounded-xl border bg-background text-ink-900 placeholder:text-ink-500 px-3.5 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 transition-colors"
+            style={{
+              minHeight: 42,
+              maxHeight: 120,
+              borderColor: "hsl(var(--border))",
+              "--tw-ring-color": "hsl(var(--social-500))",
+            }}
+            onFocus={(e) => (e.target.style.borderColor = "hsl(var(--social-500))")}
+            onBlur={(e) => (e.target.style.borderColor = "hsl(var(--border))")}
             onInput={(e) => {
               // Auto-grow
               e.target.style.height = "auto";
@@ -490,14 +472,17 @@ export default function ConversationPage() {
             onClick={handleSend}
             disabled={!draft.trim() || sending}
             className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-colors disabled:opacity-40"
-            style={{ background: draft.trim() ? "#d4af37" : "#f0ebe3", color: draft.trim() ? "#1a1a2e" : "#9a8c7a" }}
+            style={{
+              backgroundColor: draft.trim() ? "hsl(var(--social-500))" : "hsl(var(--secondary))",
+              color: draft.trim() ? "white" : "hsl(var(--ink-500))",
+            }}
             aria-label="Send message"
           >
-            <SendIcon />
+            <Send className="h-4 w-4" />
           </button>
         </div>
 
-        <p className="text-[10px] text-[#c2b8a8] mt-1.5 px-1">Shift + Enter for a new line</p>
+        <p className="text-[10px] text-ink-500 mt-1.5 px-1">Shift + Enter for a new line</p>
       </div>
     </div>
   );

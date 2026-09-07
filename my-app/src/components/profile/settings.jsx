@@ -1,7 +1,93 @@
+// src/components/profile/settings.jsx
 import { useState, useRef } from "react";
+import {
+  User, Camera, Link2, Compass, MessageCircle, Mail, Lock, AlertTriangle,
+  Check, X, Flame,
+} from "lucide-react";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import NotificationSettings from "./notificationsettings";
+import { updateProfileExtras } from "../profile/profileapi";
+
+const SPRINT_DAYS = [
+  { value: "MON", label: "Mon" },
+  { value: "TUE", label: "Tue" },
+  { value: "WED", label: "Wed" },
+  { value: "THU", label: "Thu" },
+  { value: "FRI", label: "Fri" },
+  { value: "SAT", label: "Sat" },
+  { value: "SUN", label: "Sun" },
+];
+
+// ── Shared bits ──────────────────────────────────────────────────────────
+
+function SectionCard({ children }) {
+  return (
+    <section className="bg-card border border-border rounded-2xl p-6 sm:p-8">
+      {children}
+    </section>
+  );
+}
+
+function SectionHeader({ icon: Icon, tint = "social", title, subtitle }) {
+  return (
+    <div className="flex items-start gap-4 mb-6">
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+        style={{ backgroundColor: `hsl(var(--${tint}-100))` }}
+      >
+        <Icon className="w-5 h-5" style={{ color: `hsl(var(--${tint}-500))` }} />
+      </div>
+      <div>
+        <h2 className="text-lg font-display font-semibold text-ink-900">{title}</h2>
+        {subtitle && <p className="text-sm text-ink-500 mt-0.5">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+function FieldLabel({ htmlFor, children, hint }) {
+  return (
+    <label htmlFor={htmlFor} className="block text-sm font-medium text-ink-900 mb-2">
+      {children} {hint && <span className="text-ink-500 font-normal">{hint}</span>}
+    </label>
+  );
+}
+
+const inputClass =
+  "w-full px-4 py-3 rounded-lg border border-border bg-background text-ink-900 placeholder:text-ink-500 " +
+  "focus:ring-2 focus:ring-social-500 focus:border-social-500 transition-all disabled:opacity-50";
+
+function ErrorBanner({ children }) {
+  if (!children) return null;
+  return (
+    <div className="rounded-xl px-4 py-3" style={{ backgroundColor: "hsl(var(--highlight-100))" }}>
+      <p className="text-sm" style={{ color: "hsl(var(--highlight-700))" }}>{children}</p>
+    </div>
+  );
+}
+
+function SuccessBanner({ children }) {
+  if (!children) return null;
+  return (
+    <div className="rounded-xl px-4 py-3 flex items-center gap-2" style={{ backgroundColor: "hsl(var(--success-100))" }}>
+      <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "hsl(var(--success-700))" }} />
+      <p className="text-sm" style={{ color: "hsl(var(--success-700))" }}>{children}</p>
+    </div>
+  );
+}
+
+function PrimaryButton({ children, disabled, tint = "social", className = "", ...rest }) {
+  return (
+    <button
+      disabled={disabled}
+      className={`px-5 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 ${className}`}
+      style={{ backgroundColor: `hsl(var(--${tint}-500))` }}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function Settings() {
   const { user, updateUserContext, logout } = useAuth();
@@ -35,6 +121,52 @@ export default function Settings() {
   const [socialLoading, setSocialLoading] = useState(false);
   const [socialError, setSocialError]     = useState("");
   const [socialSuccess, setSocialSuccess] = useState("");
+
+  // ─── Public profile extras (country/genre/fun fact/sprint prefs/AMA) ──
+  const [extrasForm, setExtrasForm] = useState({
+    country:            user?.country            ?? "",
+    genre:              user?.genre              ?? "",
+    funFact:            user?.funFact             ?? "",
+    favoriteSprintTime: user?.favoriteSprintTime  ?? "",
+    favoriteSprintDays: user?.favoriteSprintDays  ?? [],
+    allowAskMeAnything: user?.allowAskMeAnything  ?? false,
+  });
+  const [extrasLoading, setExtrasLoading] = useState(false);
+  const [extrasError, setExtrasError]     = useState("");
+  const [extrasSuccess, setExtrasSuccess] = useState("");
+
+  function toggleSprintDay(day) {
+    setExtrasForm((f) => ({
+      ...f,
+      favoriteSprintDays: f.favoriteSprintDays.includes(day)
+        ? f.favoriteSprintDays.filter((d) => d !== day)
+        : [...f.favoriteSprintDays, day],
+    }));
+    setExtrasError(""); setExtrasSuccess("");
+  }
+
+  async function handleSaveExtras(e) {
+    e.preventDefault();
+    setExtrasError("");
+    setExtrasSuccess("");
+    setExtrasLoading(true);
+    try {
+      const updated = await updateProfileExtras({
+        country: extrasForm.country.trim(),
+        genre: extrasForm.genre.trim(),
+        funFact: extrasForm.funFact.trim(),
+        favoriteSprintTime: extrasForm.favoriteSprintTime.trim(),
+        favoriteSprintDays: extrasForm.favoriteSprintDays,
+        allowAskMeAnything: extrasForm.allowAskMeAnything,
+      });
+      if (updateUserContext) updateUserContext({ ...user, ...updated });
+      setExtrasSuccess("Profile updated.");
+    } catch (err) {
+      setExtrasError(err.message || "Failed to save. Please try again.");
+    } finally {
+      setExtrasLoading(false);
+    }
+  }
 
   // ─── Discord state ────────────────────────────────────────────
   const [discordError, setDiscordError]     = useState("");
@@ -258,478 +390,519 @@ export default function Settings() {
   }
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-2xl mx-auto">
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-2xl mx-auto">
 
-      {/* Page header */}
-      <div className="mb-8">
-        <h1 className="text-3xl sm:text-4xl font-serif text-ink-primary mb-2">Settings</h1>
-        <p className="text-ink-gray text-sm">Manage your profile and account</p>
-      </div>
+        {/* Page header */}
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-display font-semibold text-ink-900 mb-1">Settings</h1>
+          <p className="text-ink-500 text-sm">Manage your profile and account</p>
+        </div>
 
-      <div className="space-y-6">
+        <div className="space-y-6">
 
-        {/* ─── Profile section ──────────────────────────────────── */}
-        <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[#2d3748] flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-lg font-serif text-ink-primary">Profile</h2>
-              <p className="text-sm text-ink-gray mt-0.5">Your public-facing identity on Inkwell</p>
-            </div>
-          </div>
+          {/* ─── Profile section ──────────────────────────────────── */}
+          <SectionCard>
+            <SectionHeader icon={User} tint="social" title="Profile" subtitle="Your public-facing identity" />
 
-          <form onSubmit={handleSaveProfile} className="space-y-5">
-            {/* Avatar */}
-            <div>
-              <label className="block text-sm font-medium text-ink-primary mb-3">
-                Profile picture
-              </label>
-              <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#e8e0d0] bg-[#f4f1ec] flex items-center justify-center shrink-0">
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="font-serif text-3xl text-[#b8a898]">
-                      {user?.username?.[0]?.toUpperCase() ?? "?"}
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 rounded-xl border border-[#e8e0d0] text-sm text-[#6b5c4a] hover:border-[#2d3748] hover:text-[#2d3748] transition-all font-medium"
-                  >
-                    {avatarPreview ? "Change photo" : "Upload photo"}
-                  </button>
-                  {avatarPreview && avatarPreview !== user?.avatar && (
+            <form onSubmit={handleSaveProfile} className="space-y-5">
+              {/* Avatar */}
+              <div>
+                <FieldLabel>Profile picture</FieldLabel>
+                <div className="flex items-center gap-4">
+                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-border bg-secondary flex items-center justify-center shrink-0">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="font-display text-3xl font-semibold text-ink-500">
+                        {user?.username?.[0]?.toUpperCase() ?? "?"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2">
                     <button
                       type="button"
-                      onClick={() => { setAvatarFile(null); setAvatarPreview(user?.avatar ?? null); }}
-                      className="block text-xs text-[#9a8c7a] hover:text-[#c0392b] transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-border text-sm text-ink-700 hover:border-social-500 hover:text-social-500 transition-all font-medium"
                     >
-                      Remove
+                      <Camera className="h-3.5 w-3.5" />
+                      {avatarPreview ? "Change photo" : "Upload photo"}
                     </button>
-                  )}
-                  <p className="text-xs text-[#b8a898]">JPG, PNG or WebP · Max 5 MB</p>
+                    {avatarPreview && avatarPreview !== user?.avatar && (
+                      <button
+                        type="button"
+                        onClick={() => { setAvatarFile(null); setAvatarPreview(user?.avatar ?? null); }}
+                        className="block text-xs text-ink-500 hover:text-highlight-500 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
+                    <p className="text-xs text-ink-500">JPG, PNG or WebP · Max 5 MB</p>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
                 </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleAvatarChange}
-                  className="hidden"
-                />
               </div>
-            </div>
 
-            {/* Username */}
-            <div>
-              <label htmlFor="settingsUsername" className="block text-sm font-medium text-ink-primary mb-2">
-                Username
-              </label>
-              <input
-                id="settingsUsername"
-                type="text"
-                value={profileForm.username}
-                onChange={(e) => { setProfileForm({ ...profileForm, username: e.target.value }); setProfileError(""); setProfileSuccess(""); }}
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
-                disabled={profileLoading}
-              />
-            </div>
-
-            {/* Bio */}
-            <div>
-              <label htmlFor="settingsBio" className="block text-sm font-medium text-ink-primary mb-2">
-                Bio <span className="text-ink-lightgray font-normal">({bioCharCount}/400)</span>
-              </label>
-              <textarea
-                id="settingsBio"
-                rows={3}
-                value={profileForm.bio}
-                onChange={(e) => { setProfileForm({ ...profileForm, bio: e.target.value }); setProfileError(""); setProfileSuccess(""); }}
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray resize-none"
-                disabled={profileLoading}
-              />
-            </div>
-
-            {/* Date of Birth */}
-            <div>
-              <label htmlFor="settingsDob" className="block text-sm font-medium text-ink-primary mb-2">
-                Date of Birth <span className="text-ink-lightgray font-normal">(optional)</span>
-              </label>
-              <input
-                id="settingsDob"
-                type="date"
-                value={profileForm.dateOfBirth}
-                onChange={(e) => { setProfileForm({ ...profileForm, dateOfBirth: e.target.value }); setProfileError(""); setProfileSuccess(""); }}
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
-                disabled={profileLoading}
-              />
-            </div>
-
-            {profileError   && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3"><p className="text-sm text-red-800">{profileError}</p></div>}
-            {profileSuccess && <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3"><p className="text-sm text-green-800">{profileSuccess}</p></div>}
-
-            <button
-              type="submit"
-              disabled={profileLoading}
-              className="px-5 py-2 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:bg-[#1e2a38] transition-colors disabled:opacity-50"
-            >
-              {profileLoading ? "Saving…" : "Save profile"}
-            </button>
-          </form>
-        </section>
-
-        {/* ─── Social Links ─────────────────────────────────────── */}
-        <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[#2d3748] flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-lg font-serif text-ink-primary">Social Links</h2>
-              <p className="text-sm text-ink-gray mt-0.5">Add up to 2 links to your profile</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveSocialLinks} className="space-y-4">
-            {socialLinks.map((link, i) => (
-              <div key={i} className="grid grid-cols-[140px_1fr] gap-3">
+              {/* Username */}
+              <div>
+                <FieldLabel htmlFor="settingsUsername">Username</FieldLabel>
                 <input
+                  id="settingsUsername"
                   type="text"
-                  value={link.platform}
-                  onChange={(e) => {
-                    const updated = socialLinks.map((l, idx) => idx === i ? { ...l, platform: e.target.value } : l);
-                    setSocialLinks(updated);
-                    setSocialError(""); setSocialSuccess("");
-                  }}
-                  placeholder="Platform name"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-ink-lightgray bg-white text-ink-gray placeholder-gray-400 transition-all focus:ring-2 focus:ring-ink-gold focus:border-ink-gold"
+                  value={profileForm.username}
+                  onChange={(e) => { setProfileForm({ ...profileForm, username: e.target.value }); setProfileError(""); setProfileSuccess(""); }}
+                  className={inputClass}
+                  disabled={profileLoading}
                 />
+              </div>
+
+              {/* Bio */}
+              <div>
+                <FieldLabel htmlFor="settingsBio" hint={`(${bioCharCount}/400)`}>Bio</FieldLabel>
+                <textarea
+                  id="settingsBio"
+                  rows={3}
+                  value={profileForm.bio}
+                  onChange={(e) => { setProfileForm({ ...profileForm, bio: e.target.value }); setProfileError(""); setProfileSuccess(""); }}
+                  className={`${inputClass} resize-none`}
+                  disabled={profileLoading}
+                />
+              </div>
+
+              {/* Date of Birth */}
+              <div>
+                <FieldLabel htmlFor="settingsDob" hint="(optional)">Date of Birth</FieldLabel>
                 <input
-                  type="url"
-                  value={link.url}
-                  onChange={(e) => {
-                    const updated = socialLinks.map((l, idx) => idx === i ? { ...l, url: e.target.value } : l);
-                    setSocialLinks(updated);
-                    setSocialError(""); setSocialSuccess("");
-                  }}
-                  placeholder="https://twitter.com/yourhandle"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-ink-lightgray bg-white text-ink-gray placeholder-gray-400 transition-all focus:ring-2 focus:ring-ink-gold focus:border-ink-gold"
+                  id="settingsDob"
+                  type="date"
+                  value={profileForm.dateOfBirth}
+                  onChange={(e) => { setProfileForm({ ...profileForm, dateOfBirth: e.target.value }); setProfileError(""); setProfileSuccess(""); }}
+                  className={inputClass}
+                  disabled={profileLoading}
                 />
               </div>
-            ))}
 
-            {socialError   && <p className="text-sm text-red-600">{socialError}</p>}
-            {socialSuccess && <p className="text-sm text-green-600">{socialSuccess}</p>}
+              <ErrorBanner>{profileError}</ErrorBanner>
+              <SuccessBanner>{profileSuccess}</SuccessBanner>
 
-            <button
-              type="submit"
-              disabled={socialLoading}
-              className="px-5 py-2 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:bg-[#1e2a38] transition-colors disabled:opacity-50"
-            >
-              {socialLoading ? "Saving…" : "Save links"}
-            </button>
-          </form>
-        </section>
+              <PrimaryButton type="submit" disabled={profileLoading}>
+                {profileLoading ? "Saving…" : "Save profile"}
+              </PrimaryButton>
+            </form>
+          </SectionCard>
 
-        {/* ─── Discord section ───────────────────────────────────── */}
-        {isDiscordLinked && (
-          <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-[#5865F2] flex items-center justify-center shrink-0">
-                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
-                </svg>
+          {/* ─── Social Links ─────────────────────────────────────── */}
+          <SectionCard>
+            <SectionHeader icon={Link2} tint="social" title="Social Links" subtitle="Add up to 2 links to your profile" />
+
+            <form onSubmit={handleSaveSocialLinks} className="space-y-4">
+              {socialLinks.map((link, i) => (
+                <div key={i} className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-3">
+                  <input
+                    type="text"
+                    value={link.platform}
+                    onChange={(e) => {
+                      const updated = socialLinks.map((l, idx) => idx === i ? { ...l, platform: e.target.value } : l);
+                      setSocialLinks(updated);
+                      setSocialError(""); setSocialSuccess("");
+                    }}
+                    placeholder="Platform name"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background text-ink-900 placeholder:text-ink-500 transition-all focus:ring-2 focus:ring-social-500 focus:border-social-500"
+                  />
+                  <input
+                    type="url"
+                    value={link.url}
+                    onChange={(e) => {
+                      const updated = socialLinks.map((l, idx) => idx === i ? { ...l, url: e.target.value } : l);
+                      setSocialLinks(updated);
+                      setSocialError(""); setSocialSuccess("");
+                    }}
+                    placeholder="https://twitter.com/yourhandle"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background text-ink-900 placeholder:text-ink-500 transition-all focus:ring-2 focus:ring-social-500 focus:border-social-500"
+                  />
+                </div>
+              ))}
+
+              {socialError   && <p className="text-sm" style={{ color: "hsl(var(--highlight-500))" }}>{socialError}</p>}
+              {socialSuccess && <p className="text-sm" style={{ color: "hsl(var(--success-500))" }}>{socialSuccess}</p>}
+
+              <PrimaryButton type="submit" disabled={socialLoading}>
+                {socialLoading ? "Saving…" : "Save links"}
+              </PrimaryButton>
+            </form>
+          </SectionCard>
+
+          {/* ─── Public Profile Extras ───────────────────────────────── */}
+          <SectionCard>
+            <SectionHeader icon={Compass} tint="quest" title="Writer Card" subtitle="Shown when other writers click your name" />
+
+            <form onSubmit={handleSaveExtras} className="space-y-5">
+              <div className="grid sm:grid-cols-2 gap-5">
+                <div>
+                  <FieldLabel htmlFor="settingsCountry">Country</FieldLabel>
+                  <input
+                    id="settingsCountry"
+                    type="text"
+                    value={extrasForm.country}
+                    onChange={(e) => { setExtrasForm({ ...extrasForm, country: e.target.value }); setExtrasError(""); setExtrasSuccess(""); }}
+                    placeholder="e.g. Nigeria"
+                    className={inputClass}
+                    disabled={extrasLoading}
+                  />
+                </div>
+                <div>
+                  <FieldLabel htmlFor="settingsGenre">Genre you write</FieldLabel>
+                  <input
+                    id="settingsGenre"
+                    type="text"
+                    value={extrasForm.genre}
+                    onChange={(e) => { setExtrasForm({ ...extrasForm, genre: e.target.value }); setExtrasError(""); setExtrasSuccess(""); }}
+                    placeholder="e.g. Fantasy"
+                    className={inputClass}
+                    disabled={extrasLoading}
+                  />
+                </div>
               </div>
+
               <div>
-                <h2 className="text-lg font-serif text-ink-primary">Discord</h2>
-                <p className="text-sm text-ink-gray mt-0.5">Your Discord account is connected</p>
+                <FieldLabel htmlFor="settingsFunFact">Fun fact</FieldLabel>
+                <input
+                  id="settingsFunFact"
+                  type="text"
+                  value={extrasForm.funFact}
+                  onChange={(e) => { setExtrasForm({ ...extrasForm, funFact: e.target.value }); setExtrasError(""); setExtrasSuccess(""); }}
+                  placeholder="Something short and fun about you"
+                  className={inputClass}
+                  disabled={extrasLoading}
+                />
               </div>
-            </div>
 
-            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4">
-              <svg className="w-5 h-5 text-green-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
               <div>
-                <p className="text-sm font-medium text-green-800">Discord account linked</p>
-                <p className="text-xs text-green-600 mt-0.5 font-mono">{user?.discordId}</p>
+                <FieldLabel htmlFor="settingsSprintTime">Favorite sprint time</FieldLabel>
+                <input
+                  id="settingsSprintTime"
+                  type="text"
+                  value={extrasForm.favoriteSprintTime}
+                  onChange={(e) => { setExtrasForm({ ...extrasForm, favoriteSprintTime: e.target.value }); setExtrasError(""); setExtrasSuccess(""); }}
+                  placeholder="e.g. Evenings, 8–10pm"
+                  className={inputClass}
+                  disabled={extrasLoading}
+                />
               </div>
-            </div>
 
-            {discordError   && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3"><p className="text-sm text-red-800">{discordError}</p></div>}
-            {discordSuccess && <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-3"><p className="text-sm text-green-800">{discordSuccess}</p></div>}
+              <div>
+                <FieldLabel>Favorite sprint days</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  {SPRINT_DAYS.map((d) => {
+                    const active = extrasForm.favoriteSprintDays.includes(d.value);
+                    return (
+                      <button
+                        key={d.value}
+                        type="button"
+                        onClick={() => toggleSprintDay(d.value)}
+                        disabled={extrasLoading}
+                        className="px-3 py-1.5 rounded-full text-sm font-medium border transition-all"
+                        style={
+                          active
+                            ? { backgroundColor: "hsl(var(--social-500))", color: "white", borderColor: "hsl(var(--social-500))" }
+                            : { borderColor: "hsl(var(--border))", color: "hsl(var(--ink-500))" }
+                        }
+                      >
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-            <button
-              onClick={handleUnlinkDiscord}
-              disabled={discordLoading}
-              className="px-4 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-            >
-              {discordLoading ? "Unlinking..." : "Unlink Discord"}
-            </button>
-          </section>
-        )}
+              <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-border">
+                <div>
+                  <p className="text-sm font-medium text-ink-900">Ask me anything</p>
+                  <p className="text-xs text-ink-500 mt-1 leading-relaxed">
+                    Let other writers message you directly from your profile popup, even if you haven't talked before.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={extrasForm.allowAskMeAnything}
+                  onClick={() => {
+                    setExtrasForm((f) => ({ ...f, allowAskMeAnything: !f.allowAskMeAnything }));
+                    setExtrasError(""); setExtrasSuccess("");
+                  }}
+                  disabled={extrasLoading}
+                  className="shrink-0 relative w-11 h-6 rounded-full transition-colors"
+                  style={{ backgroundColor: extrasForm.allowAskMeAnything ? "hsl(var(--social-500))" : "hsl(var(--paper-muted))" }}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${extrasForm.allowAskMeAnything ? "translate-x-5" : ""}`}
+                  />
+                </button>
+              </div>
 
-        {/* ─── Recovery Email ───────────────────────────────────── */}
-        <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-lg font-serif text-ink-primary">Recovery Email</h2>
-              <p className="text-sm text-ink-gray mt-0.5">Update your email</p>
-            </div>
-          </div>
+              <ErrorBanner>{extrasError}</ErrorBanner>
+              <SuccessBanner>{extrasSuccess}</SuccessBanner>
 
-          <form onSubmit={handleSaveEmail} className="space-y-4">
-            <div>
-              <label htmlFor="recoveryEmail" className="block text-sm font-medium text-ink-primary mb-2">
-                Email Address
-              </label>
-              <input
-                id="recoveryEmail"
-                type="email"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setEmailError(""); setEmailSuccess(""); }}
-                placeholder="you@example.com"
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray text-sm focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
-                disabled={emailLoading}
-              />
-            </div>
+              <PrimaryButton type="submit" disabled={extrasLoading} tint="quest">
+                {extrasLoading ? "Saving…" : "Save writer card"}
+              </PrimaryButton>
+            </form>
+          </SectionCard>
 
-            {emailError   && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3"><p className="text-sm text-red-800">{emailError}</p></div>}
-            {emailSuccess && <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3"><p className="text-sm text-green-800">{emailSuccess}</p></div>}
+          {/* ─── Discord section ───────────────────────────────────── */}
+          {isDiscordLinked && (
+            <SectionCard>
+              <div className="flex items-start gap-4 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-[#5865F2] flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-display font-semibold text-ink-900">Discord</h2>
+                  <p className="text-sm text-ink-500 mt-0.5">Your Discord account is connected</p>
+                </div>
+              </div>
 
-            <button
-              type="submit"
-              disabled={emailLoading}
-              className="w-full py-3 px-6 bg-amber-500 text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {emailLoading ? "Saving..." : hasEmail ? "Update Email" : "Save Email"}
-            </button>
-          </form>
-        </section>
+              <div className="flex items-center gap-3 rounded-xl px-4 py-3 mb-4" style={{ backgroundColor: "hsl(var(--success-100))" }}>
+                <Check className="w-5 h-5 shrink-0" style={{ color: "hsl(var(--success-500))" }} />
+                <div>
+                  <p className="text-sm font-medium" style={{ color: "hsl(var(--success-700))" }}>Discord account linked</p>
+                  <p className="text-xs mt-0.5 font-mono" style={{ color: "hsl(var(--success-700))" }}>{user?.discordId}</p>
+                </div>
+              </div>
 
-        {/* ─── Password section ──────────────────────────────────── */}
-        <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[#2d3748] flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-lg font-serif text-ink-primary">Password</h2>
-              <p className="text-sm text-ink-gray mt-0.5">
-                {isDiscordOnly
-                  ? "Set a password so you can log in with your Discord ID + password"
-                  : "Update your account password"}
-              </p>
-            </div>
-          </div>
+              <ErrorBanner>{discordError}</ErrorBanner>
+              <SuccessBanner>{discordSuccess}</SuccessBanner>
 
-          {isDiscordOnly && (
-            <div className="bg-[#f0f0ff] border border-[#c7c9f9] rounded-xl px-4 py-3 mb-4">
-              <p className="text-xs text-[#3b3f9e]">
-                <strong>How login works for you:</strong> You joined via Discord, so you can log in using your
-                Discord ID as your username and the password you set here. No email needed.
-              </p>
-            </div>
+              <button
+                onClick={handleUnlinkDiscord}
+                disabled={discordLoading}
+                className="mt-3 px-4 py-2 text-sm rounded-lg border transition-colors disabled:opacity-50"
+                style={{ color: "hsl(var(--highlight-500))", borderColor: "hsl(var(--highlight-300))" }}
+              >
+                {discordLoading ? "Unlinking..." : "Unlink Discord"}
+              </button>
+            </SectionCard>
           )}
 
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            {!isDiscordOnly && (
+          {/* ─── Recovery Email ───────────────────────────────────── */}
+          <SectionCard>
+            <SectionHeader icon={Mail} tint="achievement" title="Recovery Email" subtitle="Update your email" />
+
+            <form onSubmit={handleSaveEmail} className="space-y-4">
               <div>
-                <label htmlFor="currentPassword" className="block text-sm font-medium text-ink-primary mb-2">
-                  Current Password
-                </label>
+                <FieldLabel htmlFor="recoveryEmail">Email Address</FieldLabel>
                 <input
-                  id="currentPassword"
+                  id="recoveryEmail"
+                  type="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setEmailError(""); setEmailSuccess(""); }}
+                  placeholder="you@example.com"
+                  className={inputClass}
+                  disabled={emailLoading}
+                />
+              </div>
+
+              <ErrorBanner>{emailError}</ErrorBanner>
+              <SuccessBanner>{emailSuccess}</SuccessBanner>
+
+              <PrimaryButton type="submit" disabled={emailLoading} tint="achievement" className="w-full">
+                {emailLoading ? "Saving..." : hasEmail ? "Update Email" : "Save Email"}
+              </PrimaryButton>
+            </form>
+          </SectionCard>
+
+          {/* ─── Password section ──────────────────────────────────── */}
+          <SectionCard>
+            <SectionHeader
+              icon={Lock}
+              tint="social"
+              title="Password"
+              subtitle={isDiscordOnly
+                ? "Set a password so you can log in with your Discord ID + password"
+                : "Update your account password"}
+            />
+
+            {isDiscordOnly && (
+              <div className="rounded-xl px-4 py-3 mb-4" style={{ backgroundColor: "hsl(var(--bonus-100))" }}>
+                <p className="text-xs" style={{ color: "hsl(var(--bonus-700))" }}>
+                  <strong>How login works for you:</strong> You joined via Discord, so you can log in using your
+                  Discord ID as your username and the password you set here. No email needed.
+                </p>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              {!isDiscordOnly && (
+                <div>
+                  <FieldLabel htmlFor="currentPassword">Current Password</FieldLabel>
+                  <input
+                    id="currentPassword"
+                    type="password"
+                    value={passwords.currentPassword}
+                    onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
+                    className={inputClass}
+                    disabled={passwordLoading}
+                  />
+                </div>
+              )}
+
+              <div>
+                <FieldLabel htmlFor="newPassword">{isDiscordOnly ? "Password" : "New Password"}</FieldLabel>
+                <input
+                  id="newPassword"
                   type="password"
-                  value={passwords.currentPassword}
-                  onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-ink-lightgray focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
+                  value={passwords.newPassword}
+                  onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
+                  className={inputClass}
                   disabled={passwordLoading}
                 />
               </div>
-            )}
 
-            <div>
-              <label htmlFor="newPassword" className="block text-sm font-medium text-ink-primary mb-2">
-                {isDiscordOnly ? "Password" : "New Password"}
-              </label>
-              <input
-                id="newPassword"
-                type="password"
-                value={passwords.newPassword}
-                onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
-                disabled={passwordLoading}
-              />
-            </div>
+              <div>
+                <FieldLabel htmlFor="confirmPassword">{isDiscordOnly ? "Confirm Password" : "Confirm New Password"}</FieldLabel>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={passwords.confirmPassword}
+                  onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
+                  className={inputClass}
+                  disabled={passwordLoading}
+                />
+              </div>
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-ink-primary mb-2">
-                {isDiscordOnly ? "Confirm Password" : "Confirm New Password"}
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={passwords.confirmPassword}
-                onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
-                disabled={passwordLoading}
-              />
-            </div>
+              <ErrorBanner>{passwordError}</ErrorBanner>
+              <SuccessBanner>{passwordSuccess}</SuccessBanner>
 
-            {passwordError   && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3"><p className="text-sm text-red-800">{passwordError}</p></div>}
-            {passwordSuccess && <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3"><p className="text-sm text-green-800">{passwordSuccess}</p></div>}
+              <PrimaryButton type="submit" disabled={passwordLoading} className="w-full">
+                {passwordLoading ? "Saving..." : isDiscordOnly ? "Set Password" : "Update Password"}
+              </PrimaryButton>
+            </form>
+          </SectionCard>
 
-            <button
-              type="submit"
-              disabled={passwordLoading}
-              className="w-full py-3 px-6 bg-ink-primary text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {passwordLoading ? "Saving..." : isDiscordOnly ? "Set Password" : "Update Password"}
-            </button>
-          </form>
-        </section>
-
-        {/* ─── Notification Preferences ──────────────────────────── */}
-        <NotificationSettings />
-
-        {/* ─── Danger Zone ───────────────────────────────────────── */}
-        <section className="rounded-2xl border-2 border-red-200 bg-white p-6 sm:p-8">
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-lg font-serif text-red-700">Danger Zone</h2>
-              <p className="text-sm text-ink-gray mt-0.5">
-                Irreversible actions — please read carefully before proceeding.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-red-100 bg-red-50">
-            <div>
-              <p className="text-sm font-medium text-ink-primary">Delete account</p>
-              <p className="text-xs text-ink-gray mt-1 leading-relaxed">
-                Your profile, projects, sprints, and private data will be permanently removed.
-                Comments and feedback you left on other writers' work will remain but show as <span className="font-mono font-medium">[deleted]</span>.
-              </p>
-            </div>
-            <button
-              onClick={() => { setShowDeleteModal(true); setDeleteError(""); setDeleteConfirmText(""); }}
-              className="shrink-0 px-4 py-2 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-100 transition-colors"
-            >
-              Delete account
-            </button>
-          </div>
-        </section>
-
-      </div>
-
-      {/* ─── Delete account confirmation modal ─────────────────── */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => { if (!deleteLoading) setShowDeleteModal(false); }}
-          />
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-5">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
-                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                </svg>
+          {/* ─── Danger Zone ───────────────────────────────────────── */}
+          <section className="rounded-2xl border p-6 sm:p-8" style={{ borderColor: "hsl(var(--highlight-300))", backgroundColor: "hsl(var(--card))" }}>
+            <div className="flex items-start gap-4 mb-6">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "hsl(var(--highlight-500))" }}>
+                <AlertTriangle className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-serif text-ink-primary">Delete your account?</h3>
-                <p className="text-sm text-ink-gray mt-0.5">This cannot be undone.</p>
+                <h2 className="text-lg font-display font-semibold" style={{ color: "hsl(var(--highlight-700))" }}>Danger Zone</h2>
+                <p className="text-sm text-ink-500 mt-0.5">
+                  Irreversible actions — please read carefully before proceeding.
+                </p>
               </div>
             </div>
 
-            <div className="space-y-3 text-sm">
-              <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 space-y-1">
-                <p className="font-medium text-red-700 mb-1">Permanently deleted</p>
-                <ul className="text-red-600 space-y-0.5 list-disc list-inside text-xs">
-                  <li>Your profile, avatar, and bio</li>
-                  <li>All projects, sprints, notes, and to-do lists</li>
-                  <li>Your notifications and account credentials</li>
-                </ul>
+            <div className="flex items-start justify-between gap-4 p-4 rounded-xl border" style={{ borderColor: "hsl(var(--highlight-300))", backgroundColor: "hsl(var(--highlight-100))" }}>
+              <div>
+                <p className="text-sm font-medium text-ink-900">Delete account</p>
+                <p className="text-xs text-ink-500 mt-1 leading-relaxed">
+                  Your profile, projects, sprints, and private data will be permanently removed.
+                  Comments and feedback you left on other writers' work will remain but show as <span className="font-mono font-medium">[deleted]</span>.
+                </p>
               </div>
-              <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3 space-y-1">
-                <p className="font-medium text-amber-700 mb-1">Preserved (shown as <span className="font-mono">[deleted]</span>)</p>
-                <ul className="text-amber-600 space-y-0.5 list-disc list-inside text-xs">
-                  <li>Comments you left on blog posts and snippets</li>
-                  <li>Feedback and critiques you gave in the Feedback Hub</li>
-                  <li>Wall posts you wrote on other members' profiles</li>
-                </ul>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="deleteConfirm" className="block text-sm font-medium text-ink-primary mb-2">
-                Type <span className="font-mono font-semibold text-red-600">{DELETE_PHRASE}</span> to confirm
-              </label>
-              <input
-                id="deleteConfirm"
-                type="text"
-                value={deleteConfirmText}
-                onChange={(e) => { setDeleteConfirmText(e.target.value); setDeleteError(""); }}
-                placeholder={DELETE_PHRASE}
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 transition-all text-ink-gray"
-                disabled={deleteLoading}
-                autoComplete="off"
-              />
-            </div>
-
-            {deleteError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                <p className="text-sm text-red-800">{deleteError}</p>
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-1">
               <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deleteLoading}
-                className="flex-1 py-2.5 px-4 text-sm font-medium text-ink-primary border border-ink-lightgray rounded-xl hover:bg-ink-cream transition-colors disabled:opacity-50"
+                onClick={() => { setShowDeleteModal(true); setDeleteError(""); setDeleteConfirmText(""); }}
+                className="shrink-0 px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
+                style={{ color: "hsl(var(--highlight-500))", borderColor: "hsl(var(--highlight-300))" }}
               >
-                Cancel
+                Delete account
               </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleteLoading || deleteConfirmText.toLowerCase() !== DELETE_PHRASE}
-                className="flex-1 py-2.5 px-4 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {deleteLoading ? "Deleting…" : "Yes, delete my account"}
-              </button>
+            </div>
+          </section>
+
+        </div>
+
+        {/* ─── Delete account confirmation modal ─────────────────── */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/70"
+              onClick={() => { if (!deleteLoading) setShowDeleteModal(false); }}
+            />
+            <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6 sm:p-8 space-y-5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "hsl(var(--highlight-100))" }}>
+                  <AlertTriangle className="w-5 h-5" style={{ color: "hsl(var(--highlight-500))" }} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-display font-semibold text-ink-900">Delete your account?</h3>
+                  <p className="text-sm text-ink-500 mt-0.5">This cannot be undone.</p>
+                </div>
+                <button onClick={() => setShowDeleteModal(false)} className="ml-auto text-ink-500 hover:text-ink-900 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-sm">
+                <div className="rounded-xl border px-4 py-3 space-y-1" style={{ borderColor: "hsl(var(--highlight-300))", backgroundColor: "hsl(var(--highlight-100))" }}>
+                  <p className="font-medium mb-1" style={{ color: "hsl(var(--highlight-700))" }}>Permanently deleted</p>
+                  <ul className="space-y-0.5 list-disc list-inside text-xs" style={{ color: "hsl(var(--highlight-700))" }}>
+                    <li>Your profile, avatar, and bio</li>
+                    <li>All projects, sprints, notes, and to-do lists</li>
+                    <li>Your notifications and account credentials</li>
+                  </ul>
+                </div>
+                <div className="rounded-xl border px-4 py-3 space-y-1" style={{ borderColor: "hsl(var(--achievement-300))", backgroundColor: "hsl(var(--achievement-100))" }}>
+                  <p className="font-medium mb-1" style={{ color: "hsl(var(--achievement-700))" }}>
+                    Preserved (shown as <span className="font-mono">[deleted]</span>)
+                  </p>
+                  <ul className="space-y-0.5 list-disc list-inside text-xs" style={{ color: "hsl(var(--achievement-700))" }}>
+                    <li>Comments you left on blog posts and snippets</li>
+                    <li>Feedback and critiques you gave in the Feedback Hub</li>
+                    <li>Wall posts you wrote on other members' profiles</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="deleteConfirm">
+                  Type <span className="font-mono font-semibold" style={{ color: "hsl(var(--highlight-500))" }}>{DELETE_PHRASE}</span> to confirm
+                </FieldLabel>
+                <input
+                  id="deleteConfirm"
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => { setDeleteConfirmText(e.target.value); setDeleteError(""); }}
+                  placeholder={DELETE_PHRASE}
+                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-sm text-ink-900 placeholder:text-ink-500 focus:ring-2 focus:border-transparent transition-all"
+                  style={{ "--tw-ring-color": "hsl(var(--highlight-500))" }}
+                  disabled={deleteLoading}
+                  autoComplete="off"
+                />
+              </div>
+
+              <ErrorBanner>{deleteError}</ErrorBanner>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleteLoading}
+                  className="flex-1 py-2.5 px-4 text-sm font-medium text-ink-900 border border-border rounded-xl hover:bg-secondary transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteLoading || deleteConfirmText.toLowerCase() !== DELETE_PHRASE}
+                  className="flex-1 py-2.5 px-4 text-sm font-medium text-white rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: "hsl(var(--highlight-500))" }}
+                >
+                  {deleteLoading ? "Deleting…" : "Yes, delete my account"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
